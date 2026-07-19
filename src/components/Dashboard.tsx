@@ -152,6 +152,8 @@ export default function Dashboard() {
       return [
         ...base,
         { id: 'quizzes', label: 'الاختبارات والواجبات', icon: Award },
+        { id: 'tahsili', label: 'التحصيلي', icon: Film },
+        { id: 'qudurat', label: 'القدرات', icon: Film },
         { id: 'badges', label: 'الأوسمة والإنجازات', icon: Trophy },
         { id: 'schedule', label: 'الجدول الدراسي للحصص', icon: Clock },
         { id: 'wallet', label: 'المحفظة الإلكترونية وشحن الرصيد', icon: Ticket },
@@ -179,6 +181,7 @@ export default function Dashboard() {
         { id: 'quizzes', label: 'الاختبارات', icon: Award },
         { id: 'schedule', label: 'الجدول الدراسي', icon: Clock },
         { id: 'tahsili', label: 'التحصيلي', icon: Film },
+        { id: 'qudurat', label: 'القدرات', icon: Film },
         { id: 'analytics', label: 'التقارير', icon: Flame },
         { id: 'finances', label: 'الحسابات والأرباح', icon: DollarSign },
         { id: 'profile', label: 'الملف الشخصي', icon: UserIcon },
@@ -204,6 +207,8 @@ export default function Dashboard() {
       return [
         ...base,
         { id: 'quizzes', label: 'الاختبارات', icon: Award },
+        { id: 'tahsili', label: 'التحصيلي', icon: Film },
+        { id: 'qudurat', label: 'القدرات', icon: Film },
         { id: 'schedule', label: 'الجدول الدراسي', icon: Clock },
         { id: 'notes', label: 'الملاحظات السريعة', icon: Edit2 },
         { id: 'wallet', label: 'المحفظة', icon: Ticket },

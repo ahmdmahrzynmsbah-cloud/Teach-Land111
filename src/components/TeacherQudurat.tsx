@@ -196,6 +196,8 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
     setGrade(review.grade);
     setVideoUrl(review.videoUrl || '');
     setBunnyVideoId(review.bunnyVideoId || '');
+    setPdfUrl(review.pdfUrl || '');
+    setExamId(review.examId || '');
     setPrice(review.price);
     setDiscountPrice(review.discountPrice ? String(review.discountPrice) : '');
     setLessonsCount(review.lessonsCount);
@@ -251,6 +253,8 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
       teacherId: userData.id,
       videoUrl: finalVideoUrl,
       bunnyVideoId: bunnyVideoId.trim() || null,
+      pdfUrl: pdfUrl.trim() || null,
+      examId: examId.trim() || null,
       price: Number(price),
       discountPrice: parsedDiscountPrice !== undefined ? Number(parsedDiscountPrice) : null,
       lessonsCount: Number(lessonsCount),
@@ -591,7 +595,7 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                     <Film className="w-5 h-5" />
                   </div>
                   <h3 className="text-lg font-black text-gray-900 dark:text-white">
-                    {editingReview ? 'تعديل مراجعة القدرات' : 'إنشاء مراجعة تحصيلي جديدة'}
+                    {editingReview ? 'تعديل مراجعة القدرات' : 'إنشاء مراجعة قدرات جديدة'}
                   </h3>
                 </div>
                 <button
@@ -839,6 +843,28 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                       min={0}
                       value={discountPrice}
                       onChange={(e) => setDiscountPrice(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  {/* PDF and Exam */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">رابط ملف المذكرة (PDF) (اختياري):</label>
+                    <input
+                      type="url"
+                      placeholder="رابط ملف درايف أو أي رابط مباشر"
+                      value={pdfUrl}
+                      onChange={(e) => setPdfUrl(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">معرف الاختبار الشامل المرتبط (اختياري):</label>
+                    <input
+                      type="text"
+                      placeholder="معرف الاختبار (ID) لربطه بالمراجعة"
+                      value={examId}
+                      onChange={(e) => setExamId(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
