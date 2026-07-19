@@ -1,0 +1,2 @@
+#!/bin/bash
+sed -i '/<\/AnimatePresence>/i \            {activeTab === "faq" && (\n              <motion.div\n                key="faq"\n                initial={{ opacity: 0, y: 10 }}\n                animate={{ opacity: 1, y: 0 }}\n                exit={{ opacity: 0, y: -10 }}\n              >\n                <FAQSection />\n              </motion.div>\n            )}' src/components/Dashboard.tsx

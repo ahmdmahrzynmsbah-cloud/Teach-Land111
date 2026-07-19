@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    projectId: "gen-lang-client-0140690955",
+    appId: "1:999074803244:web:f33dd3e72442216c896b89",
+    apiKey: "AIzaSyC2eijCPOBU2DwDcOSSoGFMeQd6ttPsevQ",
+    authDomain: "gen-lang-client-0140690955.firebaseapp.com",
+    storageBucket: "gen-lang-client-0140690955.firebasestorage.app"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const storage = getStorage(app);
+  const storageRef = ref(storage, 'test.txt');
+
+  uploadString(storageRef, 'Hello Storage!').then((snapshot) => {
+    console.log('Uploaded a string!');
+    return getDownloadURL(storageRef);
+  }).then((url) => {
+    document.body.innerHTML = "Success! URL: " + url;
+  }).catch((error) => {
+    document.body.innerHTML = "Error: " + error.message;
+  });
+</script>
+<body>Testing Storage...</body>
+</html>

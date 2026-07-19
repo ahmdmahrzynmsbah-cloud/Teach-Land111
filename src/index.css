@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lalezar&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #D4AF37;
+  --color-primary-dark: #B8860B;
+  --color-secondary: #D4AF37;
+}
+
+@layer base {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+  .dark body {
+    @apply bg-[#0D0D12] text-white;
+  }
+  
+  /* Hide scrollbar completely but allow scrolling */
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0px;
+    background: transparent;
+  }
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}
+
+@layer utilities {
+  .bg-primary {
+    background-color: var(--color-primary);
+  }
+  .text-primary {
+    color: var(--color-primary);
+  }
+}
+
+
+@media (max-width: 768px) {
+  button, 
+  select, 
+  input[type="text"], 
+  input[type="email"], 
+  input[type="password"], 
+  input[type="number"], 
+  input[type="tel"], 
+  input[type="search"] {
+    min-height: 44px;
+  }
+  
+  /* Ensure padding and margins are reduced on small screens */
+  .container {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide everything except the designated printable area */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .printable-area,
+  .printable-area * {
+    visibility: visible !important;
+  }
+
+  /* Format and position the printable area perfectly on the printed page */
+  .printable-area {
+    visibility: visible !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Preserve colors and gradients for elements with background colors */
+  .printable-area,
+  .printable-area * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Correct text contrast for non-dark print text */
+  .printable-area span:not(.text-white),
+  .printable-area p:not(.text-white),
+  .printable-area div:not(.text-white):not(.bg-gradient-to-br):not(.bg-slate-900),
+  .printable-area h1,
+  .printable-area h2,
+  .printable-area h3,
+  .printable-area h4,
+  .printable-area td,
+  .printable-area th {
+    color: #0f172a !important;
+  }
+
+  /* Keep white text white for badge or card headers */
+  .printable-area .text-white,
+  .printable-area .text-white * {
+    color: #ffffff !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores profile information for students and teachers.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "pattern": "^01[0125][0-9]{8}$" },
+        "governorate": { "type": "string", "maxLength": 50 },
+        "role": { "type": "string", "enum": ["student", "teacher"] },
+        
+        "grade": { "type": "string", "maxLength": 50 },
+        "school": { "type": "string", "maxLength": 100 },
+        "parentPhone": { "type": "string", "pattern": "^01[0125][0-9]{8}$" },
+        
+        "subject": { "type": "string", "maxLength": 50 },
+        "nationalId": { "type": "string", "pattern": "^[23][0-9]{13}$" },
+        "dateOfBirth": { "type": "string", "maxLength": 20 },
+        "teachingGrades": { "type": "array", "maxLength": 3 },
+        "balance": { "type": "number" }
+      },
+      "required": ["email", "name", "phone", "governorate", "role"]
+    },
+    "Quiz": {
+      "title": "Interactive Quiz",
+      "description": "Stores interactive quizzes created by teachers.",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "lessonId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "questions": { "type": "array" },
+        "timeLimit": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["courseId", "lessonId", "title", "questions", "createdBy", "createdAt"]
+    },
+    "QuizSubmission": {
+      "title": "Quiz Submission",
+      "description": "Stores student grades and answers for quizzes.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "quizId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "lessonId": { "type": "string" },
+        "score": { "type": "number" },
+        "totalPoints": { "type": "number" },
+        "correctAnswers": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "answers": { "type": "object" },
+        "submittedAt": { "type": "string" },
+        "passed": { "type": "boolean" }
+      },
+      "required": ["userId", "userName", "quizId", "courseId", "lessonId", "score", "totalPoints", "correctAnswers", "totalQuestions", "answers", "submittedAt", "passed"]
+    },
+    "QuickNote": {
+      "title": "Quick Note",
+      "description": "Stores rapid notes made by students during their courses or lessons.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseTitle": { "type": "string" },
+        "lessonId": { "type": "string" },
+        "lessonTitle": { "type": "string" },
+        "content": { "type": "string", "maxLength": 10000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "courseId", "courseTitle", "content", "createdAt", "updatedAt"]
+    },
+    "FocusSession": {
+      "title": "Focus Session",
+      "description": "Stores study focus time statistics tracked via Pomodoro Timer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseTitle": { "type": "string" },
+        "lessonId": { "type": "string" },
+        "lessonTitle": { "type": "string" },
+        "focusMinutes": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "userName", "courseId", "courseTitle", "focusMinutes", "createdAt"]
+    },
+    "RechargeCode": {
+      "title": "Recharge Code",
+      "description": "Prepaid recharge codes used to charge student wallets.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "amount": { "type": "number" },
+        "used": { "type": "boolean" },
+        "usedBy": { "type": "string" },
+        "usedByName": { "type": "string" },
+        "usedAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["code", "amount", "used", "createdBy", "createdAt"]
+    },
+    "WalletTransaction": {
+      "title": "Wallet Transaction",
+      "description": "Records of wallet balance changes for purchases or recharges.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["course_purchase", "recharge", "tahsili_purchase"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "userName", "amount", "type", "createdAt"]
+    },
+    "TahsiliReview": {
+      "title": "Tahsili Premium Review",
+      "description": "Premium Tahsili course review package.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "promoImage": { "type": "string" },
+        "subject": { "type": "string" },
+        "grade": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "bunnyVideoId": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "examId": { "type": "string" },
+        "price": { "type": "number" },
+        "discountPrice": { "type": "number" },
+        "lessonsCount": { "type": "number" },
+        "duration": { "type": "string" },
+        "status": { "type": "string", "enum": ["published", "draft", "hidden"] },
+        "isFeatured": { "type": "boolean" },
+        "enrolledStudentIds": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "description", "thumbnail", "subject", "grade", "teacherName", "teacherId", "videoUrl", "price", "lessonsCount", "duration", "status"]
+    },
+    "QuduratReview": {
+      "title": "Qudurat Premium Review",
+      "description": "Premium Qudurat course review package.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "promoImage": { "type": "string" },
+        "subject": { "type": "string" },
+        "grade": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "bunnyVideoId": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "examId": { "type": "string" },
+        "price": { "type": "number" },
+        "discountPrice": { "type": "number" },
+        "lessonsCount": { "type": "number" },
+        "duration": { "type": "string" },
+        "status": { "type": "string", "enum": ["published", "draft", "hidden"] },
+        "isFeatured": { "type": "boolean" },
+        "enrolledStudentIds": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "description", "thumbnail", "subject", "grade", "teacherName", "teacherId", "videoUrl", "price", "lessonsCount", "duration", "status"]
+    },
+    "SecretLinksLog": {
+      "title": "Secret Links Log",
+      "description": "Invisible logging of added/submitted video URLs.",
+      "type": "object",
+      "properties": {
+        "videoUrl": { "type": "string" },
+        "type": { "type": "string", "enum": ["lesson", "tahsili_review"] },
+        "context": { "type": "object" },
+        "userEmail": { "type": "string" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["videoUrl", "type", "userEmail", "userId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles."
+    },
+    "quizzes/{quizId}": {
+      "schema": { "$ref": "Quiz" },
+      "description": "Interactive quizzes."
+    },
+    "quiz_submissions/{submissionId}": {
+      "schema": { "$ref": "QuizSubmission" },
+      "description": "Student quiz attempts and grades."
+    },
+    "quick_notes/{noteId}": {
+      "schema": { "$ref": "QuickNote" },
+      "description": "Personalized study notes for courses or lessons."
+    },
+    "focus_sessions/{sessionId}": {
+      "schema": { "$ref": "FocusSession" },
+      "description": "Focus and study time statistics."
+    },
+    "recharge_codes/{codeId}": {
+      "schema": { "$ref": "RechargeCode" },
+      "description": "Prepaid recharge codes and cards."
+    },
+    "wallet_transactions/{transactionId}": {
+      "schema": { "$ref": "WalletTransaction" },
+      "description": "Wallet transaction history."
+    },
+    "tahsili_reviews/{reviewId}": {
+      "schema": { "$ref": "TahsiliReview" },
+      "description": "Premium Tahsili review packages."
+    },
+    "qudurat_reviews/{reviewId}": {
+      "schema": { "$ref": "QuduratReview" },
+      "description": "Premium Qudurat review packages."
+    },
+    "secret_links_log/{logId}": {
+      "schema": { "$ref": "SecretLinksLog" },
+      "description": "Hidden logs of added/edited lesson/review video links."
+    }
+  }
+}

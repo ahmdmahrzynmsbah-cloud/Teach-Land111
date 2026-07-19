@@ -1,0 +1,6 @@
+{
+  "name": "Tafawwoq Educational Platform",
+  "description": "منصة تفوق التعليمية الذكية للطلاب والمعلمين وأولياء الأمور",
+  "requestFramePermissions": ["camera", "microphone", "display-capture"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

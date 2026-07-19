@@ -1,0 +1,2 @@
+#!/bin/bash
+sed -i '/setLessons(fetchedLessons);/a \          const reviewsQ = query(collection(db, "reviews"), where("courseId", "==", id), orderBy("createdAt", "desc"));\n          const reviewsSnap = await getDocs(reviewsQ);\n          const fetchedReviews: Review[] = [];\n          reviewsSnap.forEach(doc => {\n            fetchedReviews.push({ id: doc.id, ...doc.data() } as Review);\n          });\n          setReviews(fetchedReviews);' src/components/CourseDetails.tsx
