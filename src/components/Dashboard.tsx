@@ -1,7 +1,7 @@
 import React from "react";
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, HelpCircle, Lock, BookOpen, Star, MessageCircleQuestion, CheckCircle, Ticket, LogOut, Trophy, Flame, Bell, Target, ArrowLeft, Video, Bot, Users, Activity, User as UserIcon, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, CreditCard, PiggyBank, RefreshCw, Send, Sparkles, Loader2, DollarSign, Check, History, Award, Edit2, Edit3, Save, X, Clock, Trash2, Plus , Shield, Info, Menu, ChevronRight, ChevronLeft, Film, FileText } from 'lucide-react';
+import { Play, HelpCircle, Lock, BookOpen, Star, MessageCircleQuestion, CheckCircle, Ticket, LogOut, Trophy, Flame, Bell, Target, ArrowLeft, Video, Bot, Users, Activity, User as UserIcon, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, CreditCard, PiggyBank, RefreshCw, Send, Sparkles, Loader2, DollarSign, Check, History, Award, Edit2, Edit3, Save, X, Clock, Trash2, Plus , Shield, Info, Menu, ChevronRight, ChevronLeft, Film, FileText, Copy, Search } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import ThemeToggle from './ThemeToggle';
@@ -118,6 +118,8 @@ export default function Dashboard() {
         { id: 'admin_recharge', label: 'شحن الرصيد', icon: Ticket },
         { id: 'admin_courses', label: 'الكورسات', icon: BookOpen },
         { id: 'admin_store', label: 'مخزن الأكاديمية', icon: Edit3 },
+        { id: 'tahsili', label: 'التحصيلي', icon: Film },
+        { id: 'qudurat', label: 'القدرات', icon: Film },
         { id: 'analytics', label: 'التقارير والإحصائيات', icon: Flame },
         { id: 'finances', label: 'الحسابات والمالية', icon: DollarSign },
         { id: 'profile', label: 'الملف الشخصي', icon: UserIcon },
@@ -170,6 +172,8 @@ export default function Dashboard() {
         { id: 'admin_recharge', label: 'شحن الرصيد', icon: Ticket },
         { id: 'admin_courses', label: 'الكورسات', icon: BookOpen },
         { id: 'admin_store', label: 'مخزن الأكاديمية', icon: Edit3 },
+        { id: 'tahsili', label: 'التحصيلي', icon: Film },
+        { id: 'qudurat', label: 'القدرات', icon: Film },
         { id: 'analytics', label: 'التقارير والإحصائيات', icon: Flame },
         { id: 'finances', label: 'الحسابات والمالية', icon: DollarSign },
         { id: 'profile', label: 'الملف الشخصي', icon: UserIcon },
@@ -2640,7 +2644,7 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
               >
-                {userData?.role === 'teacher' ? (
+                {userData?.role === 'teacher' || userData?.role === 'admin' ? (
                   <TeacherTahsili userData={userData} />
                 ) : (
                   <StudentTahsili 
@@ -2659,7 +2663,7 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
               >
-                {userData?.role === 'teacher' ? (
+                {userData?.role === 'teacher' || userData?.role === 'admin' ? (
                   <TeacherQudurat userData={userData} />
                 ) : (
                   <StudentQudurat 
@@ -3217,6 +3221,28 @@ export default function Dashboard() {
                                           <span className="bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">منشور للجميع 🌍</span>
                                         )}
                                       </div>
+                                      {/* Exam ID block */}
+                                      <div 
+                                        className="flex items-center justify-between bg-gray-50 dark:bg-[#0D0D12] border border-gray-150 dark:border-[#2D2D3D] px-2 py-1.5 rounded-xl w-full mt-2"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-[9px] text-gray-400 font-bold">معرف الاختبار:</span>
+                                          <span className="text-[9px] font-mono font-bold text-gray-600 dark:text-gray-400 select-all">{quiz.id}</span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(quiz.id);
+                                            toast.success('تم نسخ معرّف الاختبار! 📋');
+                                          }}
+                                          className="text-gray-400 hover:text-[#00B4D8] dark:hover:text-[#D4AF37] p-0.5 transition-colors cursor-pointer"
+                                          title="نسخ المعرف"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -3237,10 +3263,25 @@ export default function Dashboard() {
                                   const quizSubmissions = submissionsList.filter(s => s.quizId === teacherSelectedQuiz.id);
                                   return (
                                     <div className="bg-white dark:bg-[#1A1A24] rounded-3xl p-6 border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
-                                      <div className="border-b border-gray-100 dark:border-[#2D2D3D] pb-4 flex justify-between items-center">
+                                      <div className="border-b border-gray-100 dark:border-[#2D2D3D] pb-4 flex justify-between items-center flex-wrap gap-4">
                                         <div>
                                           <h3 className="font-black text-lg text-gray-900 dark:text-white">{teacherSelectedQuiz.title}</h3>
                                           <p className="text-xs text-gray-400 font-bold mt-1">جدول تسليمات ودرجات الطلاب للتصحيح والمتابعة</p>
+                                          {/* Exam ID Display */}
+                                          <div className="flex items-center gap-1.5 mt-2 bg-gray-50 dark:bg-[#0D0D12] border border-gray-150 dark:border-[#2D2D3D] px-2.5 py-1 rounded-xl w-fit">
+                                            <span className="text-[10px] text-gray-500 font-black">معرّف الاختبار (ID):</span>
+                                            <span className="text-[10px] font-mono font-bold text-gray-700 dark:text-gray-300 select-all">{teacherSelectedQuiz.id}</span>
+                                            <button
+                                              onClick={() => {
+                                                navigator.clipboard.writeText(teacherSelectedQuiz.id);
+                                                toast.success('تم نسخ معرّف الاختبار بنجاح! 📋');
+                                              }}
+                                              className="text-gray-400 hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors cursor-pointer p-0.5"
+                                              title="نسخ معرف الاختبار"
+                                            >
+                                              <Copy className="w-3 h-3" />
+                                            </button>
+                                          </div>
                                         </div>
                                         <button
                                           onClick={() => {
@@ -3399,6 +3440,28 @@ export default function Dashboard() {
                                             <span className="bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">منشور للجميع 🌍</span>
                                           )}
                                         </div>
+                                        {/* Exam ID block */}
+                                        <div 
+                                          className="flex items-center justify-between bg-gray-50 dark:bg-[#0D0D12] border border-gray-150 dark:border-[#2D2D3D] px-2 py-1.5 rounded-xl w-full mt-2"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[9px] text-gray-400 font-bold">معرف الاختبار:</span>
+                                            <span className="text-[9px] font-mono font-bold text-gray-600 dark:text-gray-400 select-all">{quiz.id}</span>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigator.clipboard.writeText(quiz.id);
+                                              toast.success('تم نسخ معرّف الاختبار! 📋');
+                                            }}
+                                            className="text-gray-400 hover:text-[#00B4D8] dark:hover:text-[#D4AF37] p-0.5 transition-colors cursor-pointer"
+                                            title="نسخ المعرف"
+                                          >
+                                            <Copy className="w-3 h-3" />
+                                          </button>
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -3419,10 +3482,25 @@ export default function Dashboard() {
                                     const quizSubmissions = submissionsList.filter(s => s.quizId === teacherSelectedQuiz.id);
                                     return (
                                       <div className="bg-white dark:bg-[#1A1A24] rounded-3xl p-6 border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
-                                        <div className="border-b border-gray-100 dark:border-[#2D2D3D] pb-4 flex justify-between items-center">
+                                        <div className="border-b border-gray-100 dark:border-[#2D2D3D] pb-4 flex justify-between items-center flex-wrap gap-4">
                                           <div>
                                             <h3 className="font-black text-lg text-gray-900 dark:text-white">{teacherSelectedQuiz.title}</h3>
                                             <p className="text-xs text-gray-400 font-bold mt-1">جدول تسليمات ودرجات الطلاب للتقييم والمتابعة</p>
+                                            {/* Exam ID Display */}
+                                            <div className="flex items-center gap-1.5 mt-2 bg-gray-50 dark:bg-[#0D0D12] border border-gray-150 dark:border-[#2D2D3D] px-2.5 py-1 rounded-xl w-fit">
+                                              <span className="text-[10px] text-gray-500 font-black">معرّف الاختبار (ID):</span>
+                                              <span className="text-[10px] font-mono font-bold text-gray-700 dark:text-gray-300 select-all">{teacherSelectedQuiz.id}</span>
+                                              <button
+                                                onClick={() => {
+                                                  navigator.clipboard.writeText(teacherSelectedQuiz.id);
+                                                  toast.success('تم نسخ معرّف الاختبار بنجاح! 📋');
+                                                }}
+                                                className="text-gray-400 hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors cursor-pointer p-0.5"
+                                                title="نسخ معرف الاختبار"
+                                              >
+                                                <Copy className="w-3 h-3" />
+                                              </button>
+                                            </div>
                                           </div>
                                           <button
                                             onClick={() => {
@@ -3779,6 +3857,196 @@ export default function Dashboard() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Directing Quiz/Exam Modal */}
+      <AnimatePresence>
+        {directingQuiz && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-[#1A1A24] w-full max-w-lg rounded-3xl overflow-hidden border border-gray-150 dark:border-[#2D2D3D] shadow-2xl text-right"
+              style={{ direction: 'rtl' }}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-150 dark:border-[#2D2D3D] bg-gray-50/50 dark:bg-[#0D0D12]/30">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#00B4D8]/10 text-[#00B4D8] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] flex items-center justify-center">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900 dark:text-white">توجيه ونشر الاختبار</h3>
+                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">حدد الفئة المستهدفة للاختبار ليظهر لهم في لوحتهم</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDirectingQuiz(null)}
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#2D2D3D] rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
+                {/* Selected Quiz Title */}
+                <div className="bg-gray-50 dark:bg-[#0D0D12]/40 rounded-2xl p-4 border border-gray-150 dark:border-[#2D2D3D]/40">
+                  <span className="text-[10px] font-black text-[#00B4D8] dark:text-[#D4AF37] block mb-1">اسم الاختبار المحدد:</span>
+                  <p className="text-xs font-black text-gray-800 dark:text-white">{directingQuiz.title}</p>
+                </div>
+
+                {/* Target Type Selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-700 dark:text-gray-300">طريقة توجيه ونشر الاختبار:</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'all', label: 'عام للكل', desc: 'متاح لجميع الطلاب' },
+                      { id: 'grade', label: 'صف دراسي', desc: 'متاح لصف محدد' },
+                      { id: 'custom', label: 'طلاب محددين', desc: 'متاح لأسماء مخصصة' }
+                    ].map((target) => (
+                      <button
+                        key={target.id}
+                        type="button"
+                        onClick={() => setDirectTargetType(target.id as any)}
+                        className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          directTargetType === target.id
+                            ? 'border-[#00B4D8] bg-[#00B4D8]/5 text-[#00B4D8] dark:border-[#D4AF37] dark:bg-[#D4AF37]/5 dark:text-[#D4AF37]'
+                            : 'border-gray-200 dark:border-[#2D2D3D] bg-white dark:bg-[#1A1A24] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1E1E2A]'
+                        }`}
+                      >
+                        <span className="text-xs font-black">{target.label}</span>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500 font-bold">{target.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grade Selector */}
+                {directTargetType === 'grade' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">اختر الصف الدراسي المستهدف:</label>
+                    <select
+                      value={directTargetGrade}
+                      onChange={(e) => setDirectTargetGrade(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                    >
+                      {['الأول الإعدادي', 'الثاني الإعدادي', 'الثالث الإعدادي', 'الأول الثانوي', 'الثاني الثانوي', 'الثالث الثانوي'].map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Custom Student Selector */}
+                {directTargetType === 'custom' && (
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">اختر الطلاب المستهدفين من القائمة:</label>
+                    
+                    {/* Search Input */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="ابحث عن اسم الطالب..."
+                        value={studentSearchQuery}
+                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                        className="w-full pr-10 pl-4 py-2.5 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
+                      />
+                      <div className="absolute top-1/2 right-3.5 -translate-y-1/2 text-gray-400">
+                        <Users className="w-4 h-4" />
+                      </div>
+                    </div>
+
+                    {/* Students List with Checkboxes */}
+                    <div className="border border-gray-150 dark:border-[#2D2D3D] rounded-2xl divide-y divide-gray-100 dark:divide-[#2D2D3D] max-h-[180px] overflow-y-auto bg-gray-50/50 dark:bg-[#0D0D12]/20">
+                      {loadingStudents ? (
+                        <div className="p-8 text-center text-xs font-black text-gray-400 flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#00B4D8] dark:text-[#D4AF37]" />
+                          <span>جاري تحميل الطلاب...</span>
+                        </div>
+                      ) : allStudents.filter(student => 
+                        student.name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                        student.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                      ).length === 0 ? (
+                        <div className="p-8 text-center text-xs font-bold text-gray-400">
+                          لا يوجد طلاب يطابقون البحث 🔎
+                        </div>
+                      ) : (
+                        allStudents.filter(student => 
+                          student.name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                          student.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                        ).map((student) => {
+                          const isSelected = directTargetStudentIds.includes(student.id);
+                          return (
+                            <div
+                              key={student.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setDirectTargetStudentIds(prev => prev.filter(id => id !== student.id));
+                                } else {
+                                  setDirectTargetStudentIds(prev => [...prev, student.id]);
+                                }
+                              }}
+                              className="flex items-center justify-between p-3 hover:bg-gray-100 dark:hover:bg-[#1C1C28] cursor-pointer transition-colors"
+                            >
+                              <div className="text-right">
+                                <p className="text-xs font-black text-gray-800 dark:text-gray-200">{student.name || 'طالب بدون اسم'}</p>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-0.5">{student.email}</p>
+                              </div>
+                              <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${
+                                isSelected 
+                                  ? 'bg-[#00B4D8] border-[#00B4D8] text-white dark:bg-[#D4AF37] dark:border-[#D4AF37]' 
+                                  : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1A1A24]'
+                              }`}>
+                                {isSelected && <Check className="w-3.5 h-3.5" />}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    {directTargetStudentIds.length > 0 && (
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold">
+                        تم تحديد <span className="text-[#00B4D8] dark:text-[#D4AF37]">{directTargetStudentIds.length}</span> طلاب للتوجيه مخصومين من الفئات الأخرى.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="p-5 border-t border-gray-150 dark:border-[#2D2D3D] bg-gray-50/50 dark:bg-[#0D0D12]/30 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDirectingQuiz(null)}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-[#252535] dark:hover:bg-[#2F2F44] text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black transition-all cursor-pointer"
+                  disabled={savingDirecting}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDirecting}
+                  className="px-5 py-2.5 bg-[#00B4D8] hover:bg-[#0077B6] dark:bg-[#D4AF37] dark:hover:bg-[#B8860B] text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                  disabled={savingDirecting}
+                >
+                  {savingDirecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري الحفظ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>حفظ ونشر التوجيه</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       
     </div>

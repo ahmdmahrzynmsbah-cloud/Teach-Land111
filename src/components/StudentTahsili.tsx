@@ -564,29 +564,35 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                       {(review.pdfUrl || review.examId) && (
                         <div className="pt-4 border-t border-gray-100 dark:border-[#2D2D3D] flex flex-wrap gap-3">
                           {review.pdfUrl && (
-                            <a
-                              href={review.pdfUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-4 py-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors border border-rose-200 dark:border-rose-900/30"
+                            <button
+                              onClick={() => {
+                                if (review.price === 0 || isPurchased(review)) {
+                                  window.open(review.pdfUrl, '_blank');
+                                } else {
+                                  toast.error('يجب شراء المراجعة أولاً لتحميل المذكرة 🔒');
+                                }
+                              }}
+                              className="px-4 py-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors border border-rose-200 dark:border-rose-900/30 cursor-pointer"
                             >
                               <FileText className="w-4 h-4" />
                               <span>تحميل المذكرة (PDF)</span>
-                            </a>
+                              {(review.price > 0 && !isPurchased(review)) && <Lock className="w-3.5 h-3.5 text-rose-400" />}
+                            </button>
                           )}
                           {review.examId && (
                             <button
                               onClick={() => {
-                                if (isPurchased(review)) {
+                                if (review.price === 0 || isPurchased(review)) {
                                   navigate(`/exam/${review.examId}`);
                                 } else {
-                                  toast.error('يجب شراء المراجعة أولاً للوصول للاختبار');
+                                  toast.error('يجب شراء المراجعة أولاً للوصول للاختبار 🔒');
                                 }
                               }}
                               className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors border border-emerald-200 dark:border-emerald-900/30 cursor-pointer"
                             >
                               <Award className="w-4 h-4" />
                               <span>اختبار المراجعة</span>
+                              {(review.price > 0 && !isPurchased(review)) && <Lock className="w-3.5 h-3.5 text-emerald-400" />}
                             </button>
                           )}
                         </div>

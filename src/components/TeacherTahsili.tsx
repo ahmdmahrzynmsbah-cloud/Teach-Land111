@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, Video, Eye, EyeOff, Save, Trash2, Edit2, Star, Sparkles, 
   Check, Play, Clock, BookOpen, Layers, Award, Film, Loader2, Search, X, ChevronRight, CheckCircle2,
-  Upload, Link
+  Upload, Link, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, logVideoLink } from '../lib/firebase';
 import { User, TahsiliReview } from '../types';
 import { toast } from 'react-hot-toast';
-import { uploadChunkedFile, compressImageToBase64 } from '../lib/upload';
+import { uploadChunkedFile, compressImageToBase64, uploadFileToFirebase } from '../lib/upload';
 
 interface TeacherTahsiliProps {
   userData: User;
@@ -56,6 +56,8 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
 
   const [videoUploading, setVideoUploading] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
+
+  const [pdfProgress, setPdfProgress] = useState(0);
 
   const handleThumbnailUpload = async (file: File) => {
     if (!file) return;
@@ -113,6 +115,24 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
       toast.error('فشل رفع الفيديو: ' + (err.message || ''));
     } finally {
       setVideoUploading(false);
+    }
+  };
+
+  const handlePdfUpload = async (file: File) => {
+    if (!file) return;
+    setPdfUploading(true);
+    setPdfProgress(0);
+    try {
+      const url = await uploadChunkedFile(file, (p) => setPdfProgress(p), {
+        bunny: false
+      });
+      setPdfUrl(url);
+      toast.success('تم رفع ملف المذكرة الـ PDF بنجاح! 📄');
+    } catch (err: any) {
+      console.error('PDF upload failed:', err);
+      toast.error('فشل رفع ملف الـ PDF: ' + (err.message || ''));
+    } finally {
+      setPdfUploading(false);
     }
   };
 
@@ -181,6 +201,11 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
     setPromoImageProgress(0);
     setVideoUploading(false);
     setVideoProgress(0);
+
+    setPdfUrl('');
+    setPdfUploading(false);
+    setPdfProgress(0);
+    setExamId('');
 
     setShowModal(true);
   };
@@ -507,6 +532,24 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
                     <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium line-clamp-2">
                       {review.description}
                     </p>
+                    
+                    {/* Attachment Badges */}
+                    {(review.pdfUrl || review.examId) && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {review.pdfUrl && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black border border-rose-100 dark:border-rose-900/20">
+                            <FileText className="w-3 h-3" />
+                            مذكرة PDF
+                          </span>
+                        )}
+                        {review.examId && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-black border border-emerald-100 dark:border-emerald-900/20">
+                            <Award className="w-3 h-3" />
+                            اختبار مرتبط
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Stat Bar */}
@@ -847,26 +890,105 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
                     />
                   </div>
 
-                  {/* PDF and Exam */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">رابط ملف المذكرة (PDF) (اختياري):</label>
-                    <input
-                      type="url"
-                      placeholder="رابط ملف درايف أو أي رابط مباشر"
-                      value={pdfUrl}
-                      onChange={(e) => setPdfUrl(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">معرف الاختبار الشامل المرتبط (اختياري):</label>
-                    <input
-                      type="text"
-                      placeholder="معرف الاختبار (ID) لربطه بالمراجعة"
-                      value={examId}
-                      onChange={(e) => setExamId(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
+                  {/* PDF and Exam Attachment Section */}
+                  <div className="sm:col-span-2 border border-gray-150 dark:border-[#2D2D3D] bg-gray-50/50 dark:bg-[#0D0D12]/30 rounded-3xl p-5 space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-[#2D2D3D]">
+                      <FileText className="w-4 h-4 text-rose-500" />
+                      <span className="text-xs font-black text-gray-800 dark:text-gray-200">الملفات المرفقة والاختبارات المرتبطة</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* PDF Upload */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                          <span>ملف المذكرة الدراسية (PDF):</span>
+                          <span className="text-[10px] text-gray-400 font-bold">(اختياري)</span>
+                        </label>
+
+                        <div className="relative border border-dashed border-gray-300 dark:border-[#2D2D3D] rounded-2xl p-4 flex flex-col items-center justify-center text-center hover:bg-gray-100/50 dark:hover:bg-[#151520] transition-colors cursor-pointer min-h-[120px] bg-white dark:bg-[#1A1A24]">
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handlePdfUpload(file);
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            disabled={pdfUploading}
+                          />
+
+                          {pdfUploading ? (
+                            <div className="space-y-2 w-full max-w-[180px]">
+                              <Loader2 className="w-6 h-6 text-rose-500 animate-spin mx-auto" />
+                              <p className="text-[11px] font-black text-rose-600 dark:text-rose-400">جاري رفع الملف: {pdfProgress.toFixed(0)}%</p>
+                              <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${pdfProgress}%` }} />
+                              </div>
+                            </div>
+                          ) : pdfUrl ? (
+                            <div className="space-y-2 w-full">
+                              <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                                <CheckCircle2 className="w-5 h-5" />
+                              </div>
+                              <p className="text-xs font-black text-emerald-500">تم رفع الملف بنجاح ✓</p>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono line-clamp-1 max-w-[200px] mx-auto text-center" style={{ direction: 'ltr' }}>
+                                {pdfUrl.substring(pdfUrl.lastIndexOf('/') + 1) || 'pdf_document.pdf'}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setPdfUrl('');
+                                }}
+                                className="px-3 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 text-[10px] font-black rounded-lg transition-colors border border-red-100 dark:border-red-950/20 cursor-pointer mx-auto block"
+                              >
+                                حذف الملف الحالي
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload className="w-7 h-7 text-gray-400 mb-1.5" />
+                              <p className="text-[11px] font-black text-gray-700 dark:text-gray-300">اسحب ملف PDF هنا أو اضغط للرفع</p>
+                              <p className="text-[9px] text-gray-400 font-bold mt-1">الحد الأقصى للملف: 50 ميجابايت</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Exam Link */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                          <span>ربط اختبار شامل بالمراجعة:</span>
+                          <span className="text-[10px] text-gray-400 font-bold">(اختياري)</span>
+                        </label>
+                        <div className="bg-white dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl p-4 space-y-3 min-h-[120px] flex flex-col justify-center">
+                          <select
+                            value={examId}
+                            onChange={(e) => setExamId(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                          >
+                            <option value="">-- اختر اختبارًا من اختباراتك --</option>
+                            {teacherQuizzes.map((q) => (
+                              <option key={q.id} value={q.id}>
+                                {q.title || q.name || q.id}
+                              </option>
+                            ))}
+                          </select>
+                          
+                          <div className="relative flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-[#2D2D3D]">
+                            <span className="text-[9px] text-gray-400 font-black shrink-0">أو اكتب ID مخصص:</span>
+                            <input
+                              type="text"
+                              placeholder="أدخل معرّف الاختبار يدوياً"
+                              value={examId}
+                              onChange={(e) => setExamId(e.target.value)}
+                              className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-lg text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Lessons Count and Duration */}

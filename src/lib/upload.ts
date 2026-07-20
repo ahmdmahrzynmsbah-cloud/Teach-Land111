@@ -249,80 +249,72 @@ export async function uploadFileToFirebase(
  */
 export async function uploadChunkedFile(
   file: File,
-  onProgress: (progress: number) => void
+  onProgress: (progress: number) => void,
+  options?: UploadOptions & { bunny?: boolean }
 ): Promise<string> {
   const isVideo = file.type.startsWith('video/');
+  const useBunny = options?.bunny !== undefined ? options.bunny : isVideo;
   
-  if (isVideo) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const chunkSize = 2 * 1024 * 1024; // 2MB chunks
-        const totalChunks = Math.ceil(file.size / chunkSize);
-        const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
+  return new Promise(async (resolve, reject) => {
+    try {
+      const chunkSize = 2 * 1024 * 1024; // 2MB chunks
+      const totalChunks = Math.ceil(file.size / chunkSize);
+      const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
-        for (let i = 0; i < totalChunks; i++) {
-          const start = i * chunkSize;
-          const end = Math.min(start + chunkSize, file.size);
-          const chunk = file.slice(start, end);
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
 
-          const formData = new FormData();
-          formData.append('chunk', chunk);
-          formData.append('chunkIndex', i.toString());
-          formData.append('fileId', fileId);
+        const formData = new FormData();
+        formData.append('chunk', chunk);
+        formData.append('chunkIndex', i.toString());
+        formData.append('fileId', fileId);
 
-          const response = await fetch('/api/upload-chunk', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to upload chunk ${i}`);
-          }
-
-          // Calculate overall progress based on chunks + some space for merge/bunny upload
-          // Let's allocate 90% for chunking and 10% for the final merge & bunny upload
-          const chunkProgress = ((i + 1) / totalChunks) * 90;
-          onProgress(chunkProgress);
-        }
-
-        const mergeResponse = await fetch('/api/upload-merge', {
+        const response = await fetch('/api/upload-chunk', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileId,
-            totalChunks,
-            originalName: file.name,
-            bunny: true,
-          }),
+          body: formData,
         });
 
-        if (!mergeResponse.ok) {
-          const errorData = await mergeResponse.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Failed to merge chunks');
+        if (!response.ok) {
+          throw new Error(`Failed to upload chunk ${i}`);
         }
 
-        const data = await mergeResponse.json();
-        
-        if (data.videoId) {
-           onProgress(100);
-           resolve(`bunny:${data.videoId}`);
-        } else if (data.url) {
-           onProgress(100);
-           resolve(data.url);
-        } else {
-           reject(new Error('Unknown response format'));
-        }
-      } catch (error) {
-        reject(error);
+        // Calculate overall progress based on chunks + some space for merge/bunny upload
+        // Let's allocate 90% for chunking and 10% for the final merge & bunny upload
+        const chunkProgress = ((i + 1) / totalChunks) * 90;
+        onProgress(chunkProgress);
       }
-    });
-  }
 
-  // Determine validation options based on file type for non-videos (images etc)
-  const options: UploadOptions = {
-    allowedTypes: ['image/*'],
-    maxSizeBytes: 10 * 1024 * 1024, // 10MB limit for images
-  };
+      const mergeResponse = await fetch('/api/upload-merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileId,
+          totalChunks,
+          originalName: file.name,
+          bunny: useBunny,
+        }),
+      });
 
-  return uploadFileToFirebase(file, onProgress, options);
+      if (!mergeResponse.ok) {
+        const errorData = await mergeResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to merge chunks');
+      }
+
+      const data = await mergeResponse.json();
+      
+      if (data.videoId) {
+         onProgress(100);
+         resolve(`bunny:${data.videoId}`);
+      } else if (data.url) {
+         onProgress(100);
+         resolve(data.url);
+      } else {
+         reject(new Error('Unknown response format'));
+      }
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
