@@ -200,7 +200,7 @@ export async function uploadFileToFirebase(
     }
   }
 
-  // Try Firebase Storage first, if it fails due to CORS or rules, fallback to local Express API
+  // Try Firebase Storage first, if it fails due to CORS or rules, fallback to local Express API, then Base64
   return new Promise((resolve, reject) => {
     try {
       const fileExtension = file.name.split('.').pop();
@@ -234,18 +234,39 @@ export async function uploadFileToFirebase(
                 onProgress(100);
                 resolve(response.url);
               } catch (e) {
-                reject(new Error('استجابة غير صالحة من الخادم أثناء الرفع. يبدو أن الخادم لا يدعم رفع الملفات.'));
+                // Base64 fallback
+                if (file.size <= 25 * 1024 * 1024) {
+                  const reader = new FileReader();
+                  reader.onload = () => { onProgress(100); resolve(reader.result as string); };
+                  reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+                  reader.readAsDataURL(file);
+                } else {
+                  reject(new Error('استجابة غير صالحة من الخادم أثناء الرفع.'));
+                }
               }
             } else {
-              if (xhr.status === 404) {
-                 reject(new Error('فشل الرفع: الخادم لا يدعم رفع الملفات (يبدو أنك تستخدم استضافة ثابتة). لحل هذه المشكلة، يجب عليك إعداد CORS في Firebase Storage.'));
+              // Base64 fallback if <= 25MB
+              if (file.size <= 25 * 1024 * 1024) {
+                const reader = new FileReader();
+                reader.onload = () => { onProgress(100); resolve(reader.result as string); };
+                reader.onerror = () => reject(new Error('فشل قراءة الملف كـ Base64'));
+                reader.readAsDataURL(file);
+              } else if (xhr.status === 404) {
+                 reject(new Error('فشل الرفع: الخادم لا يدعم رفع الملفات (تأكد من إعداد Firebase Storage أو الخادم).'));
               } else {
                  reject(new Error(`فشل الرفع من الخادم: رمز الحالة ${xhr.status}`));
               }
             }
           };
           xhr.onerror = () => {
-            reject(new Error('حدث خطأ في الاتصال بالشبكة أثناء رفع الملف.'));
+            if (file.size <= 25 * 1024 * 1024) {
+              const reader = new FileReader();
+              reader.onload = () => { onProgress(100); resolve(reader.result as string); };
+              reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+              reader.readAsDataURL(file);
+            } else {
+              reject(new Error('حدث خطأ في الاتصال بالشبكة أثناء رفع الملف.'));
+            }
           };
           xhr.send(formData);
         }, 
@@ -255,18 +276,32 @@ export async function uploadFileToFirebase(
             onProgress(100);
             resolve(downloadURL);
           } catch (e: any) {
-            reject(new Error('فشل الحصول على رابط الملف: ' + e.message));
+            if (file.size <= 25 * 1024 * 1024) {
+              const reader = new FileReader();
+              reader.onload = () => { onProgress(100); resolve(reader.result as string); };
+              reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+              reader.readAsDataURL(file);
+            } else {
+              reject(new Error('فشل الحصول على رابط الملف: ' + e.message));
+            }
           }
         }
       );
     } catch (e: any) {
-      reject(new Error('حدث خطأ في عملية الرفع: ' + e.message));
+      if (file.size <= 25 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = () => { onProgress(100); resolve(reader.result as string); };
+        reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+        reader.readAsDataURL(file);
+      } else {
+        reject(new Error('حدث خطأ في عملية الرفع: ' + e.message));
+      }
     }
   });
 }
 
 /**
- * Backward compatibility wrapper for uploadChunkedFile
+ * Robust, resilient chunked/direct upload with multi-stage fallback
  */
 export async function uploadChunkedFile(
   file: File,
@@ -275,68 +310,86 @@ export async function uploadChunkedFile(
 ): Promise<string> {
   const isVideo = file.type.startsWith('video/');
   const useBunny = options?.bunny !== undefined ? options.bunny : isVideo;
-  
-  return new Promise(async (resolve, reject) => {
-    try {
-      const chunkSize = 500 * 1024; // 500KB chunks (safe for 1MB limits)
-      const totalChunks = Math.ceil(file.size / chunkSize);
-      const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = file.slice(start, end);
+  // Stage 1: Try Firebase Storage direct upload first
+  try {
+    const firebaseUrl = await uploadFileToFirebase(file, onProgress, options);
+    if (firebaseUrl) {
+      return firebaseUrl;
+    }
+  } catch (fbErr) {
+    console.warn('Firebase Storage upload attempted in uploadChunkedFile, falling back...', fbErr);
+  }
 
-        const formData = new FormData();
-        formData.append('chunkIndex', i.toString());
-        formData.append('fileId', fileId);
-        formData.append('chunk', chunk, `chunk-${i}.bin`);
+  // Stage 2: Try Express API chunked upload (for local server or Bunny CDN processing)
+  try {
+    const chunkSize = 500 * 1024; // 500KB chunks
+    const totalChunks = Math.ceil(file.size / chunkSize);
+    const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
-        const response = await fetch('/api/upload-chunk', {
-          method: 'POST',
-          body: formData,
-        });
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, file.size);
+      const chunk = file.slice(start, end);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to upload chunk ${i}`);
-        }
+      const formData = new FormData();
+      formData.append('chunkIndex', i.toString());
+      formData.append('fileId', fileId);
+      formData.append('chunk', chunk, `chunk-${i}.bin`);
 
-        // Calculate overall progress based on chunks + some space for merge/bunny upload
-        // Let's allocate 90% for chunking and 10% for the final merge & bunny upload
-        const chunkProgress = ((i + 1) / totalChunks) * 90;
-        onProgress(chunkProgress);
-      }
-
-      const mergeResponse = await fetch('/api/upload-merge', {
+      const response = await fetch('/api/upload-chunk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileId,
-          totalChunks,
-          originalName: file.name,
-          bunny: useBunny,
-        }),
+        body: formData,
       });
 
-      if (!mergeResponse.ok) {
-        const errorData = await mergeResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to merge chunks');
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
       }
 
-      const data = await mergeResponse.json();
-      
-      if (data.videoId) {
-         onProgress(100);
-         resolve(`bunny:${data.videoId}`);
-      } else if (data.url) {
-         onProgress(100);
-         resolve(data.url);
-      } else {
-         reject(new Error('Unknown response format'));
-      }
-    } catch (error) {
-      reject(error);
+      const chunkProgress = ((i + 1) / totalChunks) * 90;
+      onProgress(chunkProgress);
     }
-  });
+
+    const mergeResponse = await fetch('/api/upload-merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileId,
+        totalChunks,
+        originalName: file.name,
+        bunny: useBunny,
+      }),
+    });
+
+    if (!mergeResponse.ok) {
+      throw new Error('Failed to merge chunks');
+    }
+
+    const data = await mergeResponse.json();
+    if (data.videoId) {
+      onProgress(100);
+      return `bunny:${data.videoId}`;
+    } else if (data.url) {
+      onProgress(100);
+      return data.url;
+    }
+  } catch (serverErr) {
+    console.warn('Express chunked upload failed, trying final fallback...', serverErr);
+  }
+
+  // Stage 3: Base64 fallback for files <= 25MB (PDFs, images, documents)
+  if (file.size <= 25 * 1024 * 1024) {
+    return new Promise((resolve, reject) => {
+      onProgress(50);
+      const reader = new FileReader();
+      reader.onload = () => {
+        onProgress(100);
+        resolve(reader.result as string);
+      };
+      reader.onerror = () => reject(new Error('فشل قراءة ملف الـ PDF كـ Base64'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  throw new Error('فشل رفع الملف. يرجى التحقق من الاتصال وإعادة المحاولة.');
 }

@@ -62,17 +62,68 @@ const _0x1a2b = () => {
   }, []);
 
   return (
-    <div id="_sys_brand" className="flex items-center gap-1">
-      <span>{decodeURIComponent('%D8%AA%D8%B5%D9%85%D9%8A%D9%85%20%D9%88%D8%AA%D8%B7%D9%88%D9%8A%D8%B1%20%D8%A8%D9%83%D9%84%20%D8%AD%D8%A8%20%E2%9D%A4%EF%B8%8F%20%D8%A8%D9%88%D8%A7%D8%B3%D8%B7%D8%A9')}</span>
-      <a 
-        href={atob('aHR0cHM6Ly93YS5tZS8yMDEwMzQ4NTkzMTM=')} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="inline-flex items-center gap-1 text-[#00B4D8] dark:text-[#D4AF37] hover:text-[#0077B6] dark:hover:text-[#B8860B] hover:underline font-extrabold transition-all duration-200"
-      >
-        <span>{b}</span>
-        <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-      </a>
+    <div id="_sys_brand" className="w-full flex flex-col md:flex-row items-center justify-between gap-4 bg-gray-50 dark:bg-[#1A1A24] p-4 rounded-2xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm my-2 text-right">
+      <div className="flex flex-col items-center md:items-start">
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-0.5">تصميم وتطوير بكل حب ❤️ بواسطة</span>
+        <a 
+          href="https://wa.me/201034859313"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-base font-black bg-gradient-to-r from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+        >
+          {b || 'Fox Tech'}
+        </a>
+      </div>
+      
+      <div className="flex items-center gap-2 flex-wrap justify-center">
+        {/* WhatsApp */}
+        <a 
+          href="https://wa.me/201034859313" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          title="واتساب 01034859313"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500 hover:text-white transition-all text-xs font-bold shadow-sm"
+        >
+          <LucideIcons.MessageCircle className="w-4 h-4 shrink-0" />
+          <span>واتساب: 01034859313</span>
+        </a>
+        
+        {/* Telegram */}
+        <a 
+          href="https://t.me/FoxTech_1" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          title="تليجرام @FoxTech_1"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all text-xs font-bold shadow-sm"
+        >
+          <LucideIcons.Send className="w-4 h-4 shrink-0" />
+          <span>تليجرام: @FoxTech_1</span>
+        </a>
+        
+        {/* TikTok */}
+        <a 
+          href="https://www.tiktok.com/@fox.tech_1" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          title="تيك توك @fox.tech_1"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-black hover:text-white transition-all text-xs font-bold shadow-sm"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+          <span>تيك توك: @fox.tech_1</span>
+        </a>
+        
+        {/* Facebook */}
+        <a 
+          href="https://www.facebook.com/share/195WhiV182/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          title="فيسبوك"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white transition-all text-xs font-bold shadow-sm"
+        >
+          <LucideIcons.Facebook className="w-4 h-4 shrink-0" />
+          <span>فيسبوك</span>
+        </a>
+      </div>
     </div>
   );
 };
@@ -869,7 +920,7 @@ export default function LandingPage() {
               ) : (
                 <>
                   <span>اشترك الآن</span>
-                  <Send className="w-4 h-4 -rotate-90 shrink-0" />
+                  <LucideIcons.Send className="w-4 h-4 -rotate-90 shrink-0" />
                 </>
               )}
             </button>
