@@ -234,10 +234,14 @@ export async function uploadFileToFirebase(
                 onProgress(100);
                 resolve(response.url);
               } catch (e) {
-                reject(new Error('استجابة غير صالحة من الخادم أثناء الرفع.'));
+                reject(new Error('استجابة غير صالحة من الخادم أثناء الرفع. يبدو أن الخادم لا يدعم رفع الملفات.'));
               }
             } else {
-              reject(new Error(`فشل الرفع من الخادم: رمز الحالة ${xhr.status}`));
+              if (xhr.status === 404) {
+                 reject(new Error('فشل الرفع: الخادم لا يدعم رفع الملفات (يبدو أنك تستخدم استضافة ثابتة). لحل هذه المشكلة، يجب عليك إعداد CORS في Firebase Storage.'));
+              } else {
+                 reject(new Error(`فشل الرفع من الخادم: رمز الحالة ${xhr.status}`));
+              }
             }
           };
           xhr.onerror = () => {
