@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, updateDoc, doc, deleteDoc, getDoc, setDoc, onSnapshot, arrayUnion, arrayRemove, addDoc, query, orderBy, where, increment } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, getDownloadURL } from 'firebase/storage';
+import { uploadFileToFirebase } from '../lib/upload';
 import { db, storage, auth } from '../lib/firebase';
 import { usePlatformSettings } from '../context/PlatformSettingsContext';
 import { 
@@ -1315,9 +1316,8 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
     try {
       if (logoFile) {
         toast.success("جاري رفع شعار المنصة...");
-        const storageRef = ref(storage, `settings/platform-logo-${Date.now()}`);
-        await uploadBytes(storageRef, logoFile);
-        logoUrl = await getDownloadURL(storageRef);
+        // Use uploadFileToFirebase instead of Firebase Storage directly to avoid CORS/rules issues
+        logoUrl = await uploadFileToFirebase(logoFile, () => {});
       }
 
       const updated: any = {
