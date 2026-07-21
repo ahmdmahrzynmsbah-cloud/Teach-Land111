@@ -171,7 +171,7 @@ function uploadViaLocalExpress(
     formData.append('file', file);
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/upload', true);
-    xhr.timeout = 5000; // 5-second max timeout
+    xhr.timeout = 300000; // 5 minutes (300,000 ms) max timeout for large uploads
     
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) {
@@ -228,7 +228,7 @@ function uploadViaFirebase(
           } catch (e) {}
           reject(new Error('Firebase Storage upload connection timed out'));
         }
-      }, 3000);
+      }, 8000);
 
       uploadTask.on(
         'state_changed',
@@ -269,19 +269,12 @@ function uploadViaBase64(
     onProgress(15);
     const reader = new FileReader();
     
-    // Simulate smooth rapid progress while reading local file
-    const timer = setInterval(() => {
-      onProgress(Math.min(85, Math.floor(Math.random() * 20) + 50));
-    }, 50);
-
     reader.onload = () => {
-      clearInterval(timer);
       onProgress(100);
       resolve(reader.result as string);
     };
 
     reader.onerror = () => {
-      clearInterval(timer);
       reject(new Error('فشل قراءة الملف كـ Base64'));
     };
 
@@ -334,41 +327,78 @@ export async function uploadFileToFirebase(
     }
   }
 
-  // 1. INSTANT PATH: For PDFs, images, documents, audio, or any file <= 25MB
-  // Read immediately via FileReader into Data URL in milliseconds (< 0.1s)!
-  const isPdfOrDoc = file.type === 'application/pdf' || 
-                     file.name.toLowerCase().endsWith('.pdf') || 
-                     file.type.startsWith('image/') || 
-                     file.type.startsWith('audio/') || 
-                     file.size <= 25 * 1024 * 1024;
-
-  if (isPdfOrDoc) {
-    try {
-      const dataUrl = await uploadViaBase64(file, onProgress);
-      if (dataUrl) return dataUrl;
-    } catch (e) {
-      console.warn('Base64 instant upload failed, trying server upload:', e);
-    }
-  }
-
-  // 2. Try local Express server upload (with strict 5s timeout)
+  // 1. Try direct local Express server upload first
   try {
     const localUrl = await uploadViaLocalExpress(file, onProgress);
     if (localUrl) return localUrl;
   } catch (err) {
-    console.warn('Local Express upload failed, attempting Firebase Storage fallback...', err);
+    console.warn('Direct Express upload failed, attempting Express chunked upload fallback...', err);
   }
 
-  // 3. Try Firebase Storage (with strict 3s timeout)
+  // 2. Try Express Chunked upload (500KB chunks - highly resilient for large PDFs/videos)
+  try {
+    const chunkSize = 500 * 1024; // 500KB chunks
+    const totalChunks = Math.ceil(file.size / chunkSize);
+    const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
+
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, file.size);
+      const chunk = file.slice(start, end);
+
+      const formData = new FormData();
+      formData.append('chunkIndex', i.toString());
+      formData.append('fileId', fileId);
+      formData.append('chunk', chunk, `chunk-${i}.bin`);
+
+      const response = await fetch('/api/upload-chunk', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chunk ${i} upload failed with status ${response.status}`);
+      }
+
+      onProgress(Math.min(95, Math.round(((i + 1) / totalChunks) * 95)));
+    }
+
+    const mergeResponse = await fetch('/api/upload-merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileId,
+        totalChunks,
+        originalName: file.name,
+        bunny: false,
+      }),
+    });
+
+    if (mergeResponse.ok) {
+      const data = await mergeResponse.json();
+      if (data.url) {
+        onProgress(100);
+        return data.url;
+      }
+    }
+  } catch (chunkErr) {
+    console.warn('Chunked upload failed, attempting Firebase Storage fallback...', chunkErr);
+  }
+
+  // 3. Try Firebase Storage
   try {
     const firebaseUrl = await uploadViaFirebase(file, onProgress);
     if (firebaseUrl) return firebaseUrl;
   } catch (fbErr) {
-    console.warn('Firebase Storage upload failed or timed out...', fbErr);
+    console.warn('Firebase Storage upload failed:', fbErr);
   }
 
-  // 4. Final Fallback: Base64 data URL
-  return await uploadViaBase64(file, onProgress);
+  // 4. Emergency fallback ONLY for small files <= 300KB (e.g., small logo/avatar)
+  if (file.size <= 300 * 1024) {
+    return await uploadViaBase64(file, onProgress);
+  }
+
+  throw new Error('فشل رفع الملف. يرجى التأكد من الاتصال بالشبكة وإعادة المحاولة.');
 }
 
 /**
