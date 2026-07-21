@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, updateDoc, doc, deleteDoc, getDoc, setDoc, onSnapshot, arrayUnion, arrayRemove, addDoc, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, deleteDoc, getDoc, setDoc, onSnapshot, arrayUnion, arrayRemove, addDoc, query, orderBy, where, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { usePlatformSettings } from '../context/PlatformSettingsContext';
@@ -10,11 +10,12 @@ import {
   Hash, Award, FileCheck, Check, Activity, ShieldAlert,
   MapPin, School, PhoneCall, Layers, Clock, Search, Filter,
   ArrowUpDown, SlidersHorizontal, RotateCcw, Archive, Download, Plus,
-  CreditCard, Image as ImageIcon, XCircle, Copy, History, DollarSign, Ticket, Wallet, RefreshCw
+  CreditCard, Image as ImageIcon, XCircle, Copy, History, DollarSign, Ticket, Wallet, RefreshCw, Film, PlayCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import AdminVisualStats from './AdminVisualStats';
+import SubscriptionRequests from './SubscriptionRequests';
 
 const formatRegistrationDate = (createdAt: any) => {
   if (!createdAt) return '13/07/2026';
@@ -59,7 +60,7 @@ const getMockReportRecords = (role: string, rangeType: 'all' | 'month' | 'custom
       { id: 1, type: 'متابعة تقرير', name: 'استعراض التقرير الدراسي التفصيلي للابن أحمد', details: 'حالة حضور ممتازة 100%', date: '2026-07-10', status: 'مكتمل' },
       { id: 2, type: 'نتائج الاختبارات', name: 'الإطلاع على علامات الابن أحمد في مادة الرياضيات', details: 'النتيجة: 90 / 100 (ممتاز)', date: '2026-07-03', status: 'مكتمل' },
       { id: 3, type: 'تواصل مع معلم', name: 'إرسال استفسار للمعلم المشرف م. محمد بخصوص الواجبات', details: 'الحالة: تم الرد والحل', date: '2026-06-28', status: 'مكتمل' },
-      { id: 4, type: 'شحن رصيد', name: 'تفعيل قسيمة شحن رصيد الكتب التعليمية ووسائل التدريس', details: 'القيمة المضافة: 500 جنيه مصري', date: '2026-06-15', status: 'مكتمل' },
+      { id: 4, type: 'شحن رصيد', name: 'تفعيل قسيمة شحن رصيد الكتب التعليمية ووسائل التدريس', details: 'القيمة المضافة: 500 ج.م', date: '2026-06-15', status: 'مكتمل' },
       { id: 5, type: 'متابعة غياب', name: 'تلقي إشعار التأخر الصباحي التلقائي للطالب أحمد', details: 'تم تبرير الغياب هاتفياً', date: '2026-05-22', status: 'مكتمل' },
       { id: 6, type: 'مجالس أولياء أمور', name: 'حضور مجلس الآباء السنوي الافتراضي لمناقشة الأداء', details: 'المشاركة الفعالة والتصويت', date: '2026-05-02', status: 'مكتمل' },
       { id: 7, type: 'دفع مصروفات', name: 'سداد رسوم اشتراك الفصل الدراسي الصيفي والكتب', details: 'عملية ناجحة وآمنة', date: '2026-04-12', status: 'مكتمل' }
@@ -344,7 +345,7 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
                     placeholder="أو أدخل مبلغاً مخصصاً هنا..."
                     className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-sm font-bold text-gray-900 dark:text-white"
                   />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">جنيه مصري</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">ج.م</span>
                 </div>
               </div>
 
@@ -566,11 +567,11 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
   );
 };
 
-export default function AdminPanel({ initialTab, userData }: { initialTab?: 'students' | 'teachers' | 'parents' | 'approvals' | 'payments' | 'settings' | 'wallet' | 'courses'; userData?: any }) {
+export default function AdminPanel({ initialTab, userData }: { initialTab?: 'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests'; userData?: any }) {
   const [users, setUsers] = useState<any[]>([]);
   const [progressRecords, setProgressRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'parents' | 'approvals' | 'payments' | 'settings' | 'wallet' | 'courses'>(initialTab || 'students');
+  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests'>(initialTab || 'students');
 
   useEffect(() => {
     if (initialTab) {
@@ -578,6 +579,8 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
     }
   }, [initialTab]);
   const [studentStatusFilter, setStudentStatusFilter] = useState<'active' | 'archived'>('active');
+  const [studentTrackFilter, setStudentTrackFilter] = useState<'all' | 'qudurat' | 'tahsili' | 'both' | 'regular'>('all');
+  const [specialApprovalTypeFilter, setSpecialApprovalTypeFilter] = useState<'all' | 'qudurat' | 'tahsili' | 'both'>('all');
 
   // Courses states
   const [courses, setCourses] = useState<any[]>([]);
@@ -592,6 +595,8 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
 
   // Course payments / Vodafone Cash requests state
   const [payments, setPayments] = useState<any[]>([]);
+  const [reviewPayments, setReviewPayments] = useState<any[]>([]);
+  const [paymentSubTab, setPaymentSubTab] = useState<'courses' | 'reviews'>('courses');
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -845,10 +850,24 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
       console.error("Error listening to courses:", error);
     });
 
+    // Real-time listener for review_payments collection
+    const unsubscribeReviewPayments = onSnapshot(collection(db, 'review_payments'), (snapshot) => {
+      const reviewPaymentsData: any[] = [];
+      snapshot.forEach((document) => {
+        reviewPaymentsData.push({ id: document.id, ...document.data() });
+      });
+      // Sort newest first
+      reviewPaymentsData.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setReviewPayments(reviewPaymentsData);
+    }, (error) => {
+      console.error("Error listening to review payments:", error);
+    });
+
     return () => {
       unsubscribeUsers();
       unsubscribePayments();
       unsubscribeCourses();
+      unsubscribeReviewPayments();
     };
   }, []);
 
@@ -932,6 +951,12 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
         contactPhone: (formData.get('contactPhone') as string) || platformSettings.contactPhone || '',
         contactEmail: (formData.get('contactEmail') as string) || platformSettings.contactEmail || '',
         contactAddress: (formData.get('contactAddress') as string) || platformSettings.contactAddress || '',
+        quduratVideoUrl: (formData.get('quduratVideoUrl') as string) || '',
+        tahsiliVideoUrl: (formData.get('tahsiliVideoUrl') as string) || '',
+        quduratVideoProvider: (formData.get('quduratVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
+        tahsiliVideoProvider: (formData.get('tahsiliVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
+        quduratVideoTitle: (formData.get('quduratVideoTitle') as string) || 'الفيديو التعريفي لمسار القدرات 🎯',
+        tahsiliVideoTitle: (formData.get('tahsiliVideoTitle') as string) || 'الفيديو التعريفي لمسار التحصيلي 🚀',
         socialLinks: {
           facebook: (formData.get('facebook') as string) || platformSettings.socialLinks?.facebook || '',
           twitter: (formData.get('twitter') as string) || platformSettings.socialLinks?.twitter || '',
@@ -948,6 +973,37 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
       toast.error("فشل في حفظ إعدادات المنصة");
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleApproveSpecialRegistration = async (user: any) => {
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        status: 'approved',
+        isApproved: true
+      });
+      // Update local state
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'approved', isApproved: true } : u));
+      toast.success(`تم قبول طلب تسجيل ${user.name} بنجاح ✅`);
+    } catch (error) {
+      console.error("Error approving special registration:", error);
+      toast.error('فشل قبول الطلب');
+    }
+  };
+
+  const handleRejectSpecialRegistration = async (user: any) => {
+    if (!window.confirm(`هل أنت متأكد من رفض طلب ${user.name}؟`)) return;
+    try {
+      await updateDoc(doc(db, 'users', user.id), {
+        status: 'rejected',
+        isApproved: false
+      });
+      // Update local state
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: 'rejected', isApproved: false } : u));
+      toast.error(`تم رفض طلب تسجيل ${user.name} ❌`);
+    } catch (error) {
+      console.error("Error rejecting special registration:", error);
+      toast.error('فشل رفض الطلب');
     }
   };
 
@@ -990,8 +1046,8 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
     setDeletePaymentModalOpen(false);
     
     try {
-      await deleteDoc(doc(db, 'course_payments', id));
-      setPayments(prev => prev.filter(p => p.id !== id));
+      const collectionName = paymentSubTab === 'courses' ? 'course_payments' : 'review_payments';
+      await deleteDoc(doc(db, collectionName, id));
       toast.success('تم حذف الطلب بنجاح');
     } catch (err) {
       console.error(err);
@@ -1054,6 +1110,45 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
     }
   };
 
+  const handleApproveReviewPayment = async (payment: any) => {
+    if (!payment || processingPaymentId) return;
+    setProcessingPaymentId(payment.id);
+    try {
+      // 1. Update the review enrollment status
+      const collectionName = payment.reviewType === 'tahsili' ? 'tahsili_reviews' : 'qudurat_reviews';
+      const reviewRef = doc(db, collectionName, payment.reviewId);
+      
+      await updateDoc(reviewRef, {
+        enrolledStudentIds: arrayUnion(payment.userId),
+        enrolledStudents: increment(1)
+      });
+
+      // 2. Update the payment request status to approved
+      const paymentRef = doc(db, 'review_payments', payment.id);
+      await updateDoc(paymentRef, {
+        status: 'approved',
+        updatedAt: new Date().toISOString()
+      });
+
+      // 3. Send a notification to the student
+      await addDoc(collection(db, 'notifications'), {
+        userId: payment.userId,
+        title: "تم تفعيل مراجعتك بنجاح! 🎉",
+        message: `تمت الموافقة على اشتراكك في مراجعة "${payment.reviewTitle}" وتفعيلها. يمكنك الآن البدء في المذاكرة.`,
+        read: false,
+        createdAt: new Date().toISOString(),
+        type: "enrollment"
+      });
+
+      toast.success(`تم قبول طلب الطالب ${payment.senderName} وتفعيل المراجعة بنجاح! ✨`);
+    } catch (error) {
+      console.error("Error approving review payment:", error);
+      toast.error("حدث خطأ أثناء قبول الطلب. الرجاء المحاولة مجدداً.");
+    } finally {
+      setProcessingPaymentId(null);
+    }
+  };
+
   const handleOpenRejectModal = (payment: any) => {
     setSelectedPayment(payment);
     setRejectionReason('');
@@ -1063,13 +1158,17 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
   const handleRejectPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPayment || !rejectionReason.trim()) {
-      toast.error("الرجاء إدخال سبب الرفض");
+      toast.error("الرجاء إدخل سبب الرفض");
       return;
     }
     setProcessingPaymentId(selectedPayment.id);
     try {
+      const isReview = !!selectedPayment.reviewId;
+      const collectionName = isReview ? 'review_payments' : 'course_payments';
+      const title = isReview ? selectedPayment.reviewTitle : selectedPayment.courseTitle;
+      
       // 1. Update the payment request status to rejected with reason
-      const paymentRef = doc(db, 'course_payments', selectedPayment.id);
+      const paymentRef = doc(db, collectionName, selectedPayment.id);
       await updateDoc(paymentRef, {
         status: 'rejected',
         rejectionReason: rejectionReason.trim(),
@@ -1079,8 +1178,8 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
       // 2. Send a notification to the student
       await addDoc(collection(db, 'notifications'), {
         userId: selectedPayment.userId,
-        title: "تم رفض طلب اشتراكك ❌",
-        message: `تم رفض طلب اشتراكك في كورس "${selectedPayment.courseTitle}". السبب: ${rejectionReason.trim()}`,
+        title: isReview ? "تم رفض طلب اشتراكك في المراجعة ❌" : "تم رفض طلب اشتراكك ❌",
+        message: `تم رفض طلب اشتراكك في ${isReview ? 'مراجعة' : 'كورس'} "${title}". السبب: ${rejectionReason.trim()}`,
         read: false,
         createdAt: new Date().toISOString(),
         type: "enrollment"
@@ -1099,6 +1198,10 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
   };
 
   const confirmDelete = (userId: string) => {
+    if (userId === userData?.id) {
+      toast.error('لا يمكنك حذف حسابك الخاص من لوحة التحكم!');
+      return;
+    }
     setUserToDelete(userId);
     setDeleteModalOpen(true);
   };
@@ -1321,6 +1424,23 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
       if (activeTab !== 'teachers' || subjectFilter === 'all') return true;
       return (u.subject || '').trim() === subjectFilter;
     })
+    .filter(u => {
+      if (activeTab !== 'students') return true;
+      if (studentTrackFilter === 'all') return true;
+      if (studentTrackFilter === 'regular') {
+        return !u.isSpecialRegistration;
+      }
+      if (studentTrackFilter === 'qudurat') {
+        return u.isSpecialRegistration && (u.registrationType === 'qudurat' || u.registrationType === 'both');
+      }
+      if (studentTrackFilter === 'tahsili') {
+        return u.isSpecialRegistration && (u.registrationType === 'tahsili' || u.registrationType === 'both');
+      }
+      if (studentTrackFilter === 'both') {
+        return u.isSpecialRegistration && u.registrationType === 'both';
+      }
+      return true;
+    })
     .sort((a, b) => {
       if (sortBy === 'name_asc') {
         return (a.name || '').localeCompare(b.name || '', 'ar');
@@ -1345,7 +1465,7 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
   const teachersCount = users.filter(u => u.role === 'teacher' && u.isApproved !== false).length;
   const parentsCount = users.filter(u => u.role === 'parent' && u.isApproved !== false).length;
   const pendingApprovalsCount = users.filter(u => u.isApproved === false).length;
-  const pendingPaymentsCount = payments.filter(p => p.status === 'pending').length;
+  const pendingPaymentsCount = payments.filter(p => p.status === 'pending').length + reviewPayments.filter(p => p.status === 'pending').length;
 
   if (activeTab === 'wallet') {
     return (
@@ -1518,6 +1638,23 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
             )}
           </button>
           <button
+            onClick={() => setActiveTab('subscription_requests')}
+            className={`pb-2 text-sm font-black transition-colors relative ${
+              activeTab === 'subscription_requests'
+                ? 'text-[#00B4D8] dark:text-[#D4AF37]'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+            }`}
+          >
+            مراجعة الاشتراكات ({users.filter(u => u.isSpecialRegistration && u.status === 'pending').length})
+            {activeTab === 'subscription_requests' && (
+              <motion.div 
+                layoutId="adminTab" 
+                className="absolute -bottom-[13px] left-0 right-0 h-[3px] bg-[#00B4D8] dark:bg-[#D4AF37] rounded-t-full shadow-[0_1px_4px_rgba(0,180,216,0.3)] dark:shadow-[0_1px_4px_rgba(212,175,55,0.3)]" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className={`pb-2 text-sm font-black transition-colors relative ${
               activeTab === 'settings'
@@ -1618,7 +1755,7 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
               <div className="hidden md:block md:col-span-3"></div>
             )}
 
-            {/* Subject Filter (Visible only for teachers) */}
+            {/* Subject Filter (Visible only for teachers) or Track Filter (Visible only for students) */}
             {activeTab === 'teachers' ? (
               <div className="relative md:col-span-2">
                 <BookOpen className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -1631,6 +1768,21 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                   {teacherSubjects.map((sub) => (
                     <option key={sub} value={sub}>{sub}</option>
                   ))}
+                </select>
+              </div>
+            ) : activeTab === 'students' ? (
+              <div className="relative md:col-span-2">
+                <SlidersHorizontal className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                <select
+                  value={studentTrackFilter}
+                  onChange={(e) => setStudentTrackFilter(e.target.value as any)}
+                  className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pr-10 pl-4 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 outline-none focus:border-[#00B4D8] dark:focus:border-[#D4AF37] transition-all appearance-none cursor-pointer"
+                >
+                  <option value="all">كل المسارات</option>
+                  <option value="qudurat">مسار القدرات 🎯</option>
+                  <option value="tahsili">مسار التحصيلي 🚀</option>
+                  <option value="both">المسارين معاً 💫</option>
+                  <option value="regular">المسار العام 🏫</option>
                 </select>
               </div>
             ) : (
@@ -1811,6 +1963,105 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                       <option value="true">تفعيل وعرض</option>
                       <option value="false">إخفاء</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Introductory Videos Card */}
+              <div className="bg-gray-50/50 dark:bg-[#0D0D12]/30 p-6 rounded-2xl border border-gray-150 dark:border-[#2D2D3D] md:col-span-2 space-y-4">
+                <h3 className="text-base font-black text-gray-800 dark:text-white flex items-center gap-2">
+                  <Film className="w-5 h-5 text-[#00B4D8] dark:text-[#D4AF37]" /> الفيديوهات التعريفية للمسارات (قدرات وتحصيلي)
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
+                  أضف روابط فيديوهات تعريفية جذابة ومميزة تظهر للطلاب في بروتفوليو الصفحة الرئيسية لتشجيعهم واجتذابهم للاشتراك. يدعم يوتيوب، تيك توك، باني ستريم، والروابط المباشرة.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {/* Qudurat Video Settings */}
+                  <div className="p-4 bg-white dark:bg-[#12121A] rounded-xl border border-gray-100 dark:border-[#222230] space-y-4 shadow-sm">
+                    <h4 className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-gray-100 dark:border-[#222230] pb-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                      الفيديو التعريفي لمسار القدرات 🎯
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الفيديو الجاذب</label>
+                        <input
+                          type="text"
+                          name="quduratVideoTitle"
+                          defaultValue={platformSettings.quduratVideoTitle || 'الفيديو التعريفي لمسار القدرات 🎯'}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-emerald-500 dark:text-white font-bold text-xs"
+                          placeholder="مثال: فجر طاقتك الكامنة واضمن الـ +95٪ مع شرحنا التفاعلي!"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">مزود الفيديو</label>
+                        <select
+                          name="quduratVideoProvider"
+                          defaultValue={platformSettings.quduratVideoProvider || 'youtube'}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-emerald-500 dark:text-white font-bold text-xs cursor-pointer"
+                        >
+                          <option value="youtube">يوتيوب (YouTube)</option>
+                          <option value="tiktok">تيك توك (TikTok)</option>
+                          <option value="bunny">باني ستريم (Bunny Stream ID)</option>
+                          <option value="direct">رابط فيديو مباشر (Direct Link)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">رابط الفيديو أو معرف الفيديو (Stream ID)</label>
+                        <input
+                          type="text"
+                          name="quduratVideoUrl"
+                          defaultValue={platformSettings.quduratVideoUrl || ''}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-emerald-500 dark:text-white font-mono text-xs text-left"
+                          dir="ltr"
+                          placeholder="https://www.youtube.com/watch?v=... or Video ID"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tahsili Video Settings */}
+                  <div className="p-4 bg-white dark:bg-[#12121A] rounded-xl border border-gray-100 dark:border-[#222230] space-y-4 shadow-sm">
+                    <h4 className="text-xs sm:text-sm font-black text-purple-600 dark:text-purple-400 flex items-center gap-1.5 border-b border-gray-100 dark:border-[#222230] pb-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                      الفيديو التعريفي لمسار التحصيلي 🚀
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الفيديو الجاذب</label>
+                        <input
+                          type="text"
+                          name="tahsiliVideoTitle"
+                          defaultValue={platformSettings.tahsiliVideoTitle || 'الفيديو التعريفي لمسار التحصيلي 🚀'}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-purple-500 dark:text-white font-bold text-xs"
+                          placeholder="مثال: دليلك الشامل لتقفيل درجات التحصيلي في أقصر وقت وبأقل مجهود!"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">مزود الفيديو</label>
+                        <select
+                          name="tahsiliVideoProvider"
+                          defaultValue={platformSettings.tahsiliVideoProvider || 'youtube'}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-purple-500 dark:text-white font-bold text-xs cursor-pointer"
+                        >
+                          <option value="youtube">يوتيوب (YouTube)</option>
+                          <option value="tiktok">تيك توك (TikTok)</option>
+                          <option value="bunny">باني ستريم (Bunny Stream ID)</option>
+                          <option value="direct">رابط فيديو مباشر (Direct Link)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">رابط الفيديو أو معرف الفيديو (Stream ID)</label>
+                        <input
+                          type="text"
+                          name="tahsiliVideoUrl"
+                          defaultValue={platformSettings.tahsiliVideoUrl || ''}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-purple-500 dark:text-white font-mono text-xs text-left"
+                          dir="ltr"
+                          placeholder="https://www.youtube.com/watch?v=... or Video ID"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2231,10 +2482,177 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
-              className={`overflow-auto max-h-[600px] relative rounded-2xl border border-gray-100 dark:border-[#2D2D3D]/50 scrollbar-thin ${activeTab === 'payments' ? 'p-6 bg-gray-50/30 dark:bg-[#0D0D12]/30' : ''}`}
+              className={`overflow-auto max-h-[600px] relative rounded-2xl border border-gray-100 dark:border-[#2D2D3D]/50 scrollbar-thin ${(activeTab === 'payments' || activeTab === 'subscription_requests') ? 'p-6 bg-gray-50/30 dark:bg-[#0D0D12]/30' : ''}`}
             >
-              {activeTab === 'payments' ? (
+              {activeTab === 'subscription_requests' ? (
+                <SubscriptionRequests adminUserData={userData} />
+              ) : activeTab === 'special_approvals' ? (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="flex justify-between items-center bg-white dark:bg-[#1A1A24] p-5 rounded-3xl border border-gray-100 dark:border-[#2D2D3D] shadow-sm">
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <Sparkles className="w-6 h-6 text-amber-500" /> طلبات القدرات والتحصيلي المعلقة
+                      </h3>
+                      <p className="text-xs font-bold text-gray-400 mt-1">مراجعة بيانات الطلاب المتقدمين للمسارات الخاصة وقبول أو رفض انضمامهم للمنصة</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-400">إجمالي الطلبات:</span>
+                      <span className="bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-black px-3 py-1.5 rounded-xl border border-amber-200/30">
+                        {users.filter(u => u.isSpecialRegistration && u.status === 'pending').length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Type Filter Buttons for Pending Special Approvals */}
+                  <div className="flex flex-wrap items-center gap-2.5 bg-white dark:bg-[#1A1A24] p-4 rounded-3xl border border-gray-100 dark:border-[#2D2D3D] shadow-sm">
+                    <span className="text-xs font-black text-gray-400 ml-2">تصفية حسب المسار المعلق:</span>
+                    {(['all', 'qudurat', 'tahsili', 'both'] as const).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setSpecialApprovalTypeFilter(type)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border-0 ${
+                          specialApprovalTypeFilter === type
+                            ? 'bg-[#00B4D8] text-white dark:bg-[#D4AF37] dark:text-gray-950 shadow-md'
+                            : 'bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-[#12121A] dark:text-gray-400 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        {type === 'all' && 'الكل'}
+                        {type === 'qudurat' && 'القدرات 🎯'}
+                        {type === 'tahsili' && 'التحصيلي 🚀'}
+                        {type === 'both' && 'المسارين معاً 💫'}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {users.filter(u => {
+                      const isPendingSpecial = u.isSpecialRegistration && u.status === 'pending';
+                      if (!isPendingSpecial) return false;
+                      if (specialApprovalTypeFilter === 'all') return true;
+                      if (specialApprovalTypeFilter === 'qudurat') {
+                        return u.registrationType === 'qudurat' || u.registrationType === 'both';
+                      }
+                      if (specialApprovalTypeFilter === 'tahsili') {
+                        return u.registrationType === 'tahsili' || u.registrationType === 'both';
+                      }
+                      if (specialApprovalTypeFilter === 'both') {
+                        return u.registrationType === 'both';
+                      }
+                      return true;
+                    }).length > 0 ? (
+                      users.filter(u => {
+                        const isPendingSpecial = u.isSpecialRegistration && u.status === 'pending';
+                        if (!isPendingSpecial) return false;
+                        if (specialApprovalTypeFilter === 'all') return true;
+                        if (specialApprovalTypeFilter === 'qudurat') {
+                          return u.registrationType === 'qudurat' || u.registrationType === 'both';
+                        }
+                        if (specialApprovalTypeFilter === 'tahsili') {
+                          return u.registrationType === 'tahsili' || u.registrationType === 'both';
+                        }
+                        if (specialApprovalTypeFilter === 'both') {
+                          return u.registrationType === 'both';
+                        }
+                        return true;
+                      }).map((user) => (
+                        <motion.div
+                          key={user.id}
+                          layout
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white dark:bg-[#1A1A24] rounded-[2.5rem] p-6 border border-gray-100 dark:border-[#2D2D3D] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative overflow-hidden group"
+                        >
+                          <div className="flex items-start justify-between mb-5">
+                            <div className="flex items-center gap-4">
+                              <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-[#0D0D12] flex items-center justify-center text-[#00B4D8] dark:text-[#D4AF37] border border-gray-100 dark:border-[#2D2D3D] group-hover:scale-110 transition-transform shadow-inner">
+                                <UserIcon className="w-7 h-7" />
+                              </div>
+                              <div>
+                                <h4 className="font-black text-base text-gray-900 dark:text-white">{user.name}</h4>
+                                <p className="text-[11px] font-bold text-gray-400 mt-0.5" dir="ltr">{user.phone}</p>
+                              </div>
+                            </div>
+                            <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black border ${
+                              user.registrationType === 'qudurat' 
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-900/30' 
+                                : 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-900/30'
+                            }`}>
+                              {user.registrationType === 'qudurat' ? 'القدرات' : 'التحصيلي'}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 mb-6 bg-gray-50/50 dark:bg-[#0D0D12]/30 p-4 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                            <div className="flex items-center justify-between text-[11px] font-bold">
+                              <div className="flex items-center gap-1.5 text-gray-400">
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>تاريخ الطلب:</span>
+                              </div>
+                              <span className="text-gray-700 dark:text-gray-300">{formatRegistrationDate(user.createdAt)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] font-bold">
+                              <div className="flex items-center gap-1.5 text-gray-400">
+                                <Shield className="w-3.5 h-3.5" />
+                                <span>المحافظة:</span>
+                              </div>
+                              <span className="text-gray-700 dark:text-gray-300">{user.governorate || 'غير محدد'}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              onClick={() => handleApproveSpecialRegistration(user)}
+                              className="py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-black transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 group/btn cursor-pointer border-0"
+                            >
+                              <Check className="w-4 h-4 group-hover/btn:scale-125 transition-transform" /> قبول وتفعيل
+                            </button>
+                            <button
+                              onClick={() => handleRejectSpecialRegistration(user)}
+                              className="py-3 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:hover:bg-red-900/40 dark:text-red-400 rounded-2xl text-xs font-black transition-all border border-red-100 dark:border-red-900/30 flex items-center justify-center gap-2 group/btn cursor-pointer"
+                            >
+                              <X className="w-4 h-4 group-hover/btn:rotate-90 transition-transform" /> رفض الطلب
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <div className="col-span-full py-24 bg-white dark:bg-[#1A1A24] rounded-[3rem] border border-dashed border-gray-200 dark:border-[#2D2D3D] text-center">
+                        <div className="w-20 h-20 bg-gray-50 dark:bg-[#0D0D12] rounded-3xl flex items-center justify-center mx-auto mb-5 text-gray-300 dark:text-gray-800">
+                          <Sparkles className="w-10 h-10" />
+                        </div>
+                        <h4 className="text-base font-black text-gray-900 dark:text-white">لا توجد طلبات معلقة حالياً</h4>
+                        <p className="text-xs font-bold text-gray-400 mt-2 max-w-xs mx-auto">عندما يقوم الطلاب بالتسجيل في مسار القدرات أو التحصيلي، ستظهر طلباتهم هنا للمراجعة</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : activeTab === 'payments' ? (
                 <div className="space-y-6">
+                  {/* Payments Sub-Tabs Toggle */}
+                  <div className="flex bg-gray-100 dark:bg-[#0D0D12] p-1.5 rounded-2xl border border-gray-200 dark:border-[#2D2D3D] mb-4">
+                    <button
+                      onClick={() => setPaymentSubTab('courses')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
+                        paymentSubTab === 'courses' 
+                          ? 'bg-white dark:bg-[#1A1A24] text-rose-600 dark:text-rose-400 shadow-md' 
+                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      اشتراكات الكورسات
+                    </button>
+                    <button
+                      onClick={() => setPaymentSubTab('reviews')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
+                        paymentSubTab === 'reviews' 
+                          ? 'bg-white dark:bg-[#1A1A24] text-purple-600 dark:text-purple-400 shadow-md' 
+                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      اشتراكات القدرات والتحصيلي
+                    </button>
+                  </div>
+
                   {/* Payments Filter Header */}
                   <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white dark:bg-[#1A1A24] p-4 rounded-2xl border border-gray-100 dark:border-[#2D2D3D] shadow-sm">
                     <div className="flex items-center gap-3 w-full md:w-auto">
@@ -2272,13 +2690,13 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                     </div>
                   </div>
 
-                  {/* Payments Grid */}
-                  {payments.filter(p => {
-                    const matchSearch = p.userName?.includes(paymentSearch) || p.senderPhone?.includes(paymentSearch) || p.senderName?.includes(paymentSearch);
+                  {/* Payments Table */}
+                  {(paymentSubTab === 'courses' ? payments : reviewPayments).filter(p => {
+                    const matchSearch = (p.userName || '').includes(paymentSearch) || (p.senderPhone || '').includes(paymentSearch) || (p.senderName || '').includes(paymentSearch);
                     const matchStatus = paymentStatusFilter === 'all' || p.status === paymentStatusFilter;
                     return matchSearch && matchStatus;
                   }).length === 0 ? (
-                    <div className="py-16 text-center">
+                    <div className="py-16 text-center bg-white dark:bg-[#1A1A24] rounded-3xl border border-gray-100 dark:border-[#2D2D3D] shadow-sm">
                       <div className="w-20 h-20 mx-auto rounded-3xl bg-rose-50 dark:bg-rose-950/20 border border-dashed border-rose-200 dark:border-rose-900/30 flex items-center justify-center text-rose-400 mb-4">
                         <Archive className="w-8 h-8 stroke-[1.5]" />
                       </div>
@@ -2286,116 +2704,156 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                       <p className="text-sm text-gray-400 dark:text-gray-500">لم يتم العثور على أي طلبات تطابق معايير البحث الحالية.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {payments.filter(p => {
-                        const matchSearch = p.userName?.includes(paymentSearch) || p.senderPhone?.includes(paymentSearch) || p.senderName?.includes(paymentSearch);
-                        const matchStatus = paymentStatusFilter === 'all' || p.status === paymentStatusFilter;
-                        return matchSearch && matchStatus;
-                      }).map((payment) => (
-                        <div key={payment.id} className="bg-white dark:bg-[#1A1A24] rounded-2xl border border-gray-100 dark:border-[#2D2D3D] p-5 shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex flex-col md:flex-row gap-5">
-                            {/* Screenshot Preview */}
-                            <div className="w-full md:w-32 h-40 bg-gray-50 dark:bg-[#0D0D12] rounded-xl border border-gray-200 dark:border-[#2D2D3D] overflow-hidden shrink-0 group relative cursor-pointer" onClick={() => { if(payment.screenshotUrl && !['uploading...', 'failed'].includes(payment.screenshotUrl)) { setSelectedImageUrl(payment.screenshotUrl); setViewImageModalOpen(true); } }}>
-                              {payment.screenshotUrl === 'uploading...' ? (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-2 bg-gray-100 dark:bg-[#2D2D3D]">
-                                  <Loader2 className="w-6 h-6 animate-spin text-[#00B4D8]" />
-                                  <span className="text-xs font-bold text-gray-500">جاري الرفع...</span>
-                                </div>
-                              ) : payment.screenshotUrl === 'failed' ? (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-rose-500 gap-2 bg-rose-50 dark:bg-rose-900/10">
-                                  <AlertTriangle className="w-6 h-6" />
-                                  <span className="text-xs font-bold">فشل الرفع</span>
-                                </div>
-                              ) : payment.screenshotUrl ? (
-                                <>
-                                  <img src={payment.screenshotUrl} alt="إثبات التحويل" className="w-full h-full object-cover" />
-                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Eye className="w-6 h-6 text-white" />
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                  <ImageIcon className="w-8 h-8 opacity-50" />
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Payment Details */}
-                            <div className="flex-1 flex flex-col justify-between">
-                              <div>
-                                <div className="flex justify-between items-start mb-2">
-                                  <div>
-                                    <h4 className="font-black text-gray-900 dark:text-white text-base">{payment.senderName}</h4>
-                                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400">حساب الطالب: {payment.userName}</p>
-                                  </div>
-                                  
-                                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${
-                                    payment.status === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
-                                    payment.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400' :
-                                    'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                                  }`}>
-                                    {payment.status === 'approved' ? 'تم القبول' : payment.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
-                                  </span>
-                                  <button onClick={() => { setPaymentToDelete(payment.id); setDeletePaymentModalOpen(true); }} className="mr-2 text-rose-500 hover:text-rose-700 p-1 bg-rose-50 dark:bg-rose-950/30 rounded-lg" title="حذف الطلب">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                
-                                
-                                <div className="space-y-1.5 mt-4">
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-gray-400"><BookOpen className="w-3.5 h-3.5" /></span>
-                                    <span className="font-bold text-gray-700 dark:text-gray-300">الكورس:</span>
-                                    <span className="font-black text-rose-600 dark:text-rose-400">{payment.courseTitle}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-gray-400"><CreditCard className="w-3.5 h-3.5" /></span>
-                                    <span className="font-bold text-gray-700 dark:text-gray-300">المبلغ المُحول:</span>
-                                    <span className="font-black text-gray-900 dark:text-white">{payment.coursePrice} ج.م</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-gray-400"><Phone className="w-3.5 h-3.5" /></span>
-                                    <span className="font-bold text-gray-700 dark:text-gray-300">رقم المحول:</span>
-                                    <span className="font-black text-gray-900 dark:text-white" dir="ltr">{payment.senderPhone}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* Actions */}
-                              {payment.status === 'pending' && (
-                                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-[#2D2D3D]">
-                                  <button
-                                    onClick={() => handleApprovePayment(payment)}
-                                    disabled={processingPaymentId === payment.id}
-                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-2 text-xs font-black transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                  >
-                                    {processingPaymentId === payment.id ? (
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <>
-                                        <CheckCircle2 className="w-4 h-4" /> قبول وتفعيل
-                                      </>
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleOpenRejectModal(payment)}
-                                    disabled={processingPaymentId === payment.id}
-                                    className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/50 dark:text-red-400 rounded-xl py-2 text-xs font-black transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 border border-red-100 dark:border-red-900/30"
-                                  >
-                                    <XCircle className="w-4 h-4" /> رفض الطلب
-                                  </button>
-                                </div>
-                              )}
-                              {payment.status === 'rejected' && payment.rejectionReason && (
-                                <div className="mt-3 p-2.5 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-100 dark:border-red-900/30 text-[10px] font-bold text-red-600 dark:text-red-400">
-                                  <span className="block mb-0.5 opacity-80">سبب الرفض:</span>
-                                  {payment.rejectionReason}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="bg-white dark:bg-[#1A1A24] rounded-2xl border border-gray-100 dark:border-[#2D2D3D] shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="border-b border-gray-100 dark:border-[#2D2D3D] bg-gray-50/50 dark:bg-[#15151F]">
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 min-w-[220px]">اسم المحول / بيانات الطالب</th>
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 min-w-[130px]">رقم الهاتف</th>
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 min-w-[300px]">الاشتراك المطلوب</th>
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 min-w-[100px]">القيمة</th>
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 text-center min-w-[140px]">إثبات الدفع</th>
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 min-w-[160px]">الحالة</th>
+                              <th className="py-4 px-6 text-xs font-black text-gray-400 text-center min-w-[180px]">الإجراءات</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(paymentSubTab === 'courses' ? payments : reviewPayments).filter(p => {
+                              const matchSearch = (p.userName || '').includes(paymentSearch) || (p.senderPhone || '').includes(paymentSearch) || (p.senderName || '').includes(paymentSearch);
+                              const matchStatus = paymentStatusFilter === 'all' || p.status === paymentStatusFilter;
+                              return matchSearch && matchStatus;
+                            }).map((payment) => {
+                              const img = paymentSubTab === 'courses' ? payment.screenshotUrl : payment.screenshot;
+                              return (
+                                <tr key={payment.id} className="border-b border-gray-100 dark:border-[#2D2D3D] hover:bg-gray-50/30 dark:hover:bg-[#1e1e2d]/40 transition-colors animate-in fade-in duration-200">
+                                  {/* Student / Sender Data */}
+                                  <td className="py-4 px-6 min-w-[220px]">
+                                    <div className="flex flex-col">
+                                      <span className="font-black text-sm text-gray-900 dark:text-white whitespace-nowrap">{payment.senderName}</span>
+                                      <span className="text-xs font-bold text-gray-400 mt-0.5 break-all">
+                                        {paymentSubTab === 'courses' ? `حساب الطالب: ${payment.userName}` : `إيميل الطالب: ${payment.userEmail}`}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Phone */}
+                                  <td className="py-4 px-6 text-xs font-black text-gray-700 dark:text-gray-300 min-w-[130px] whitespace-nowrap" dir="ltr">
+                                    {payment.senderPhone}
+                                  </td>
+
+                                  {/* Target Course / Review */}
+                                  <td className="py-4 px-6 min-w-[300px]">
+                                    <div className="flex flex-col max-w-[400px]">
+                                      <span className={`font-black text-xs leading-relaxed ${paymentSubTab === 'courses' ? 'text-rose-600 dark:text-rose-400' : 'text-purple-600 dark:text-purple-400'}`}>
+                                        {paymentSubTab === 'courses' ? payment.courseTitle : payment.reviewTitle}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-gray-400 mt-1 whitespace-nowrap">
+                                        {paymentSubTab === 'courses' ? 'كورس تفاعلي' : (payment.reviewType === 'tahsili' ? 'مراجعة تحصيلي 🎯' : 'مراجعة قدرات 🚀')}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Price */}
+                                  <td className="py-4 px-6 font-black text-xs text-gray-900 dark:text-white min-w-[100px] whitespace-nowrap">
+                                    {paymentSubTab === 'courses' ? payment.coursePrice : payment.amount} ج.م
+                                  </td>
+
+                                  {/* Screenshot Link / Proof */}
+                                  <td className="py-4 px-6 text-center min-w-[140px]">
+                                    <div className="inline-flex justify-center whitespace-nowrap">
+                                      {paymentSubTab === 'courses' && payment.screenshotUrl === 'uploading...' ? (
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00B4D8]" />
+                                          <span>جاري الرفع...</span>
+                                        </div>
+                                      ) : paymentSubTab === 'courses' && payment.screenshotUrl === 'failed' ? (
+                                        <span className="text-xs font-bold text-rose-500">فشل الرفع</span>
+                                      ) : img ? (
+                                        <button
+                                          onClick={() => {
+                                            setSelectedImageUrl(img);
+                                            setViewImageModalOpen(true);
+                                          }}
+                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-[#15151F] dark:hover:bg-gray-800 border border-gray-150 dark:border-[#2D2D3D] text-xs font-black text-[#00B4D8] dark:text-[#D4AF37] transition-all cursor-pointer border-0"
+                                        >
+                                          <Eye className="w-3.5 h-3.5" />
+                                          عرض الإثبات
+                                        </button>
+                                      ) : (
+                                        <span className="text-xs text-gray-400 font-bold">لا يوجد</span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td className="py-4 px-6 min-w-[160px]">
+                                    <div className="flex flex-col items-start gap-1">
+                                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black whitespace-nowrap ${
+                                        payment.status === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                                        payment.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400' :
+                                        'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                                      }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${
+                                          payment.status === 'approved' ? 'bg-emerald-500' :
+                                          payment.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'
+                                        }`} />
+                                        {payment.status === 'approved' ? 'تم القبول والتحويل' : payment.status === 'rejected' ? 'طلب مرفوض' : 'قيد المراجعة'}
+                                      </span>
+                                      {payment.status === 'rejected' && payment.rejectionReason && (
+                                        <span className="text-[10px] text-red-500 font-bold max-w-[150px] truncate" title={payment.rejectionReason}>
+                                          السبب: {payment.rejectionReason}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Action Buttons */}
+                                  <td className="py-4 px-6 text-center min-w-[180px]">
+                                    <div className="inline-flex gap-2">
+                                      {payment.status === 'pending' ? (
+                                        <>
+                                          <button
+                                            onClick={() => paymentSubTab === 'courses' ? handleApprovePayment(payment) : handleApproveReviewPayment(payment)}
+                                            disabled={processingPaymentId === payment.id}
+                                            className={`p-2 rounded-xl text-white ${paymentSubTab === 'courses' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-purple-600 hover:bg-purple-700'} text-xs font-black transition-all flex items-center justify-center gap-1 shadow-sm cursor-pointer border-0`}
+                                            title="موافقة وتفعيل الاشتراك"
+                                          >
+                                            {processingPaymentId === payment.id ? (
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                              <>
+                                                <Check className="w-3.5 h-3.5" />
+                                                <span className="text-[10px] pl-1 font-bold">تفعيل</span>
+                                              </>
+                                            )}
+                                          </button>
+                                          <button
+                                            onClick={() => handleOpenRejectModal(payment)}
+                                            disabled={processingPaymentId === payment.id}
+                                            className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/50 dark:text-red-400 border border-red-100 dark:border-red-900/30 text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                            title="رفض الاشتراك"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                            <span className="text-[10px] pl-1 font-bold">رفض</span>
+                                          </button>
+                                        </>
+                                      ) : null}
+                                      <button
+                                        onClick={() => { setPaymentToDelete(payment.id); setDeletePaymentModalOpen(true); }}
+                                        className="p-2 text-rose-500 hover:text-rose-700 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-100 dark:border-rose-900/20 text-xs font-black transition-all cursor-pointer"
+                                        title="حذف الطلب بشكل نهائي"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2634,12 +3092,13 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                           <p className="text-gray-900 dark:text-white font-black text-base">لم يتم العثور على نتائج</p>
                           <p className="text-xs text-gray-400 dark:text-gray-500">جرب تعديل كلمات البحث أو تصفية الفلاتر للحصول على نتائج مغايرة.</p>
                         </div>
-                        {(searchQuery || gradeFilter !== 'all' || subjectFilter !== 'all') && (
+                        {(searchQuery || gradeFilter !== 'all' || subjectFilter !== 'all' || studentTrackFilter !== 'all') && (
                           <button
                             onClick={() => {
                               setSearchQuery('');
                               setGradeFilter('all');
                               setSubjectFilter('all');
+                              setStudentTrackFilter('all');
                               setSortBy('name_asc');
                             }}
                             className="mt-2 text-xs font-black text-[#00B4D8] dark:text-[#D4AF37] hover:underline flex items-center gap-1.5"
@@ -2836,24 +3295,28 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                                     >
                                       <RotateCcw className="w-4 h-4" />
                                     </button>
-                                    <button 
-                                      onClick={() => confirmDelete(user.id)}
-                                      className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors animate-in fade-in zoom-in duration-200"
-                                      title="حذف الحساب نهائياً من الأرشيف"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    {user.id !== userData?.id && (
+                                      <button 
+                                        onClick={() => confirmDelete(user.id)}
+                                        className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors animate-in fade-in zoom-in duration-200"
+                                        title="حذف الحساب نهائياً من الأرشيف"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    )}
                                   </>
                                 )}
                               </>
                             ) : (
-                              <button 
-                                onClick={() => confirmDelete(user.id)}
-                                className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                title="حذف الحساب نهائياً"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              user.id !== userData?.id && (
+                                <button 
+                                  onClick={() => confirmDelete(user.id)}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="حذف الحساب نهائياً"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )
                             )}
                           </>
                         )}

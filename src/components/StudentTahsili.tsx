@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Play, Lock, Unlock, ArrowRight, BookOpen, Clock, Users, Star, 
   Sparkles, ShieldCheck, CreditCard, ChevronLeft, CheckCircle2, 
   Compass, Award, RefreshCw, Volume2, Info, Loader2, ArrowLeft,
-  Tv, Film, PlayCircle, Layers, CheckCircle
-, FileText } from 'lucide-react';
+  Tv, Film, PlayCircle, Layers, CheckCircle, FileText, X, Wallet, Check, AlertTriangle, Copy, Upload
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc, addDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, query, where, onSnapshot, setDoc, getDoc, increment } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { User, TahsiliReview } from '../types';
 import { toast } from 'react-hot-toast';
 import BunnyVideoPlayer from './BunnyVideoPlayer';
 import TikTokPlayer from './TikTokPlayer';
+import { usePlatformSettings } from '../context/PlatformSettingsContext';
+import { compressImageToBase64 } from '../lib/upload';
 
 interface StudentTahsiliProps {
   userData?: User | null;
@@ -27,6 +29,26 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
   const [selectedReview, setSelectedReview] = useState<TahsiliReview | null>(null);
   const [activeLessonIndex, setActiveLessonIndex] = useState<number>(0);
   const [purchasing, setPurchasing] = useState(false);
+  const { settings: platformSettings } = usePlatformSettings();
+
+  // Payment Modal States
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vodafone'>('wallet');
+  const [paymentSenderName, setPaymentSenderName] = useState('');
+  const [paymentSenderPhone, setPaymentSenderPhone] = useState('');
+  const [paymentScreenshotFile, setPaymentScreenshotFile] = useState<File | null>(null);
+  const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentUploadProgress, setPaymentUploadProgress] = useState(0);
+  const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
+  const [copiedNumber, setCopiedNumber] = useState(false);
+
+  const vodafoneCashNumber = platformSettings.vodafoneCashNumber || "";
+  const isVodafoneCashEnabled = platformSettings.isVodafoneCashEnabled ?? true;
+  const isInstapayEnabled = platformSettings.isInstapayEnabled ?? false;
+  const instapayHandle = platformSettings.instapayHandle || "";
+  const isBankAccountEnabled = platformSettings.isBankAccountEnabled ?? false;
+  const bankAccountDetails = platformSettings.bankAccountDetails || "";
 
   // local state for watched lessons map, key: reviewId_lessonIndex -> boolean
   const [watchedLessons, setWatchedLessons] = useState<Record<string, boolean>>({});
@@ -103,6 +125,7 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
 
   // Generate dynamic lessons list based on review settings
   const getReviewLessons = (review: TahsiliReview) => {
+    if (review.contentType && review.contentType !== 'video_course') return [];
     const count = review.lessonsCount || 5;
     const lessons = [];
     
@@ -137,7 +160,11 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
     try {
       if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
         const videoId = url.includes('youtu.be/') ? url.split('youtu.be/')[1].split('?')[0] : new URL(url).searchParams.get('v');
-        return `https://www.youtube.com/embed/${videoId}`;
+        return `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&iv_load_policy=3`;
+      }
+      if (url.includes('youtube.com/embed/')) {
+        const separator = url.includes('?') ? '&' : '?';
+        return `${url}${separator}modestbranding=1&rel=0&iv_load_policy=3`;
       }
       if (url.includes('tiktok.com')) {
         const match = url.match(/\/(?:video|photo|v)\/(\d+)/);
@@ -152,52 +179,42 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
   };
 
   // Purchase Review Handler
-  const handlePurchase = async (review: TahsiliReview) => {
+  const handlePurchaseClick = (review: TahsiliReview) => {
     if (!userData) {
-      toast((t) => (
-        <div className="text-right space-y-2 p-1" dir="rtl">
-          <p className="font-black text-sm text-purple-700">🔐 يرجى تسجيل الدخول أو إنشاء حساب</p>
-          <p className="text-[11px] text-gray-500 font-bold leading-relaxed">
-            لشراء مراجعة "{review.title}" المتميزة ومباشرة الدراسة والتعلم، يرجى تسجيل الدخول أولاً أو إنشاء حساب جديد مجاني بالكامل في ثوانٍ معدودة!
-          </p>
-          <div className="flex gap-2 justify-end pt-1.5">
-            <button 
-              onClick={() => { toast.dismiss(t.id); navigate('/register'); }}
-              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-black cursor-pointer border-0 shadow-sm transition-colors"
-            >
-              إنشاء حساب جديد
-            </button>
-            <button 
-              onClick={() => { toast.dismiss(t.id); navigate('/login'); }}
-              className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[10px] font-black cursor-pointer border-0 transition-colors"
-            >
-              تسجيل الدخول
-            </button>
-          </div>
-        </div>
-      ), { duration: 6000 });
+      toast.error('يرجى تسجيل حساب أولاً للمتابعة والاشتراك في المراجعة.');
+      navigate('/special-register?type=tahsili');
       return;
     }
 
-    const priceToPay = review.discountPrice !== undefined && review.discountPrice !== null && review.discountPrice < review.price
-      ? review.discountPrice
-      : review.price;
+    if (userData.isSpecialRegistration && userData.status === 'pending') {
+      toast.error('حسابك قيد المراجعة حالياً من قبل الإدارة. بمجرد قبول حسابك، ستتمكن من الاشتراك والدفع لتفعيل هذه المراجعة! ⏳');
+      return;
+    }
+
+    if (review.enrolledStudentIds?.includes(userData.id)) {
+      toast.success('أنت مشترك بالفعل في هذه المراجعة! استمتع بالتعلم');
+      return;
+    }
+
+    setSelectedReview(review);
+    setShowPaymentModal(true);
+  };
+
+  const handleWalletPayment = async () => {
+    if (!userData || !selectedReview || isPayingWithWallet) return;
+    
+    const priceToPay = selectedReview.discountPrice !== undefined && selectedReview.discountPrice !== null && selectedReview.discountPrice < selectedReview.price
+      ? selectedReview.discountPrice
+      : selectedReview.price;
 
     const balance = userData.balance || 0;
 
     if (balance < priceToPay) {
-      toast.error(
-        <div className="text-right space-y-1">
-          <p className="font-black text-xs text-red-600">❌ عذراً، رصيد محفظتك غير كافٍ</p>
-          <p className="text-[11px] text-gray-500 font-bold">تحتاج إلى شحن محفظتك بـ {(priceToPay - balance).toLocaleString('ar-EG')} ر.س إضافية لشراء هذه المراجعة.</p>
-        </div>
-      );
+      toast.error("عذراً، رصيدك في المحفظة لا يكفي");
       return;
     }
 
-    if (!window.confirm(`هل أنت متأكد من رغبتك في شراء مراجعة "${review.title}" بسعر ${priceToPay} ر.س خصماً من محفظتك؟`)) return;
-
-    setPurchasing(true);
+    setIsPayingWithWallet(true);
     try {
       const nextBalance = balance - priceToPay;
 
@@ -207,8 +224,8 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
       });
 
       // 2. Add Student to Review Enrolled List
-      const enrolledList = [...(review.enrolledStudentIds || []), userData.id];
-      await updateDoc(doc(db, 'tahsili_reviews', review.id), {
+      const enrolledList = [...(selectedReview.enrolledStudentIds || []), userData.id];
+      await updateDoc(doc(db, 'tahsili_reviews', selectedReview.id), {
         enrolledStudentIds: enrolledList
       });
 
@@ -218,7 +235,7 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
         userName: userData.name,
         amount: -priceToPay,
         type: 'tahsili_purchase',
-        description: `شراء مراجعة التحصيلي الممتازة: ${review.title}`,
+        description: `شراء مراجعة التحصيلي: ${selectedReview.title}`,
         createdAt: new Date().toISOString()
       });
 
@@ -226,26 +243,110 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
       await addDoc(collection(db, 'notifications'), {
         userId: userData.id,
         title: '🎉 تم تفعيل مراجعة التحصيلي بنجاح!',
-        message: `تهانينا! لقد تم شحن وتفعيل مراجعة "${review.title}" بنجاح. يمكنك الآن مشاهدة جميع الفيديوهات دون قيود والبدء بالتعلم فوراً!`,
+        message: `تهانينا! لقد تم تفعيل مراجعة "${selectedReview.title}" بنجاح خصماً من محفظتك.`,
         read: false,
         type: 'system',
         createdAt: new Date().toISOString()
       });
 
-      toast.success('تم الشراء وتفعيل المراجعة بنجاح! استمتع بالتعلم المميز 🚀');
+      toast.success('تم الشراء وتفعيل المراجعة بنجاح! 🚀');
       
-      // Update local state instantly for UI responsiveness
-      const updatedReview = { ...review, enrolledStudentIds: enrolledList };
-      setSelectedReview(updatedReview);
-
       if (setUserData) {
         setUserData({ ...userData, balance: nextBalance });
       }
+      
+      // Update local state instantly
+      setSelectedReview({ ...selectedReview, enrolledStudentIds: enrolledList });
+      
+      setShowPaymentModal(false);
     } catch (err) {
-      console.error('Error purchasing Tahsili review:', err);
-      toast.error('فشل في إتمام عملية الشراء، الرجاء المحاولة مرة أخرى');
+      console.error('Error purchasing with wallet:', err);
+      toast.error('فشل في إتمام العملية، الرجاء المحاولة مرة أخرى');
     } finally {
-      setPurchasing(false);
+      setIsPayingWithWallet(false);
+    }
+  };
+
+  const handleCopyNumber = () => {
+    navigator.clipboard.writeText(vodafoneCashNumber);
+    setCopiedNumber(true);
+    toast.success("تم نسخ الرقم بنجاح! 📋");
+    setTimeout(() => setCopiedNumber(false), 2000);
+  };
+
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("تم النسخ بنجاح! 📋");
+  };
+
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPaymentScreenshotFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPaymentScreenshotPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userData || !selectedReview) return;
+    if (!paymentSenderName.trim()) {
+      toast.error("الرجاء إدخال اسمك بالكامل");
+      return;
+    }
+    if (!paymentSenderPhone.trim()) {
+      toast.error("الرجاء إدخال الرقم الذي قمت بالتحويل منه");
+      return;
+    }
+    if (!paymentScreenshotFile) {
+      toast.error("الرجاء إرفاق صورة إثبات أو لقطة شاشة التحويل");
+      return;
+    }
+
+    setSubmittingPayment(true);
+    try {
+      // 1. Compress screenshot to Base64
+      let base64Screenshot = '';
+      try {
+        base64Screenshot = await compressImageToBase64(paymentScreenshotFile);
+      } catch (err) {
+        console.error("Compression error:", err);
+      }
+
+      // 2. Create the payment request document
+      const priceToPay = selectedReview.discountPrice !== undefined && selectedReview.discountPrice !== null && selectedReview.discountPrice < selectedReview.price
+        ? selectedReview.discountPrice
+        : selectedReview.price;
+
+      await addDoc(collection(db, 'review_payments'), {
+        userId: userData.id,
+        userEmail: userData.email || '',
+        reviewId: selectedReview.id,
+        reviewTitle: selectedReview.title,
+        reviewType: 'tahsili',
+        amount: priceToPay,
+        senderName: paymentSenderName.trim(),
+        senderPhone: paymentSenderPhone.trim(),
+        screenshot: base64Screenshot, // Storing as Base64 for instant approval
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+
+      toast.success("تم إرسال طلب الاشتراك بنجاح! سيتم تفعيل المراجعة بعد مراجعة الإدارة للتحويل خلال وقت قصير. ✨");
+      setShowPaymentModal(false);
+      setPaymentSenderName("");
+      setPaymentSenderPhone("");
+      setPaymentScreenshotFile(null);
+      setPaymentScreenshotPreview(null);
+    } catch (err) {
+      console.error("Payment error:", err);
+      toast.error("حدث خطأ أثناء إرسال طلب الاشتراك، يرجى المحاولة لاحقاً");
+    } finally {
+      setSubmittingPayment(false);
     }
   };
 
@@ -334,6 +435,24 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
                           
+                          {/* Content Type Badge Overlay */}
+                          {review.contentType === 'pdf_book' && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                              <div className="bg-rose-600/90 backdrop-blur-md px-3 py-2 rounded-2xl flex flex-col items-center gap-1 shadow-2xl border border-rose-400/30">
+                                <FileText className="w-6 h-6 text-white" />
+                                <span className="text-white font-black text-[10px]">ملف / مذكرة</span>
+                              </div>
+                            </div>
+                          )}
+                          {review.contentType === 'exam' && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                              <div className="bg-emerald-600/90 backdrop-blur-md px-3 py-2 rounded-2xl flex flex-col items-center gap-1 shadow-2xl border border-emerald-400/30">
+                                <Award className="w-6 h-6 text-white" />
+                                <span className="text-white font-black text-[10px]">اختبار إلكتروني</span>
+                              </div>
+                            </div>
+                          )}
+                          
                           {/* Subject and Grade Badges */}
                           <div className="absolute top-3 right-3 flex flex-wrap gap-1.5">
                             <span className="px-2.5 py-1 bg-purple-600/90 text-white rounded-lg text-[10px] font-black backdrop-blur-md">
@@ -385,14 +504,28 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
 
                           {/* Duration & Lessons Bar */}
                           <div className="flex items-center justify-between text-[10px] text-gray-400 dark:text-gray-500 font-bold border-t border-b border-gray-50 dark:border-[#2D2D3D] py-2.5">
-                            <span className="flex items-center gap-1">
-                              <Film className="w-3.5 h-3.5 text-purple-500" />
-                              <span>{review.lessonsCount} درس مراجعة</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-purple-500" />
-                              <span>مدة {review.duration}</span>
-                            </span>
+                            {(!review.contentType || review.contentType === 'video_course') ? (
+                              <>
+                                <span className="flex items-center gap-1">
+                                  <Film className="w-3.5 h-3.5 text-purple-500" />
+                                  <span>{review.lessonsCount} درس مراجعة</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-purple-500" />
+                                  <span>مدة {review.duration}</span>
+                                </span>
+                              </>
+                            ) : review.contentType === 'pdf_book' ? (
+                              <span className="flex items-center gap-1 text-gray-500 font-bold">
+                                <FileText className="w-3.5 h-3.5 text-rose-500" />
+                                <span>مذكرة دراسية (PDF)</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-gray-500 font-bold">
+                                <Award className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>اختبار إلكتروني تفاعلي</span>
+                              </span>
+                            )}
                           </div>
 
                           {/* Footer: Price and Purchase Button */}
@@ -402,15 +535,15 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                                 {discount ? (
                                   <>
                                     <span className="text-sm font-black text-purple-600 dark:text-purple-400">
-                                      {review.discountPrice} ر.س
+                                      {review.discountPrice} ج.م
                                     </span>
                                     <span className="text-[10px] text-gray-400 line-through">
-                                      {review.price} ر.س
+                                      {review.price} ج.م
                                     </span>
                                   </>
                                 ) : (
                                   <span className="text-sm font-black text-purple-600 dark:text-purple-400">
-                                    {review.price === 0 ? 'مجاني' : `${review.price} ر.س`}
+                                    {review.price === 0 ? 'مجاني' : `${review.price} ج.م`}
                                   </span>
                                 )}
                               </div>
@@ -426,7 +559,7 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedReview(review);
+                                  handlePurchaseClick(review);
                                 }}
                                 className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[10px] font-black transition-all cursor-pointer border-0 shadow-md shadow-purple-600/10 flex items-center gap-1"
                               >
@@ -455,7 +588,7 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
 
             // Progress tracking
             const reviewWatchedCount = lessons.filter((_, idx) => watchedLessons[`${review.id}_${idx}`]).length;
-            const completionPercent = Math.round((reviewWatchedCount / lessons.length) * 100);
+            const completionPercent = Math.round((reviewWatchedCount / (lessons.length || 1)) * 100);
 
             return (
               <motion.div
@@ -480,70 +613,67 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                   {/* Left/Main Column: Video Player and Details */}
                   <div className="lg:col-span-2 space-y-6">
                     {/* Premium Video Frame Container */}
-                    <div className="bg-slate-950 border border-gray-150 dark:border-[#2D2D3D] rounded-3xl overflow-hidden shadow-2xl relative aspect-video">
+                    {(!selectedReview.contentType || selectedReview.contentType === 'video_course') ? (
+    <div className="bg-slate-950 border border-gray-150 dark:border-[#2D2D3D] rounded-3xl overflow-hidden shadow-2xl relative aspect-video">
                       {/* Video embed / player */}
-                      {(!purchased && !activeLesson.isFree) ? (
-                        // LOCKED PREVIEW BLUR OVERLAY
+                      {(!purchased && !activeLesson?.isFree) ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-white p-6 text-center space-y-5 z-20">
                           <div className="absolute inset-0 bg-cover bg-center blur-md opacity-30" style={{ backgroundImage: `url(${review.thumbnail})` }} />
-                          
                           <div className="relative z-10 w-16 h-16 bg-purple-600/30 border border-purple-500 text-purple-400 rounded-full flex items-center justify-center shadow-lg animate-pulse">
                             <Lock className="w-8 h-8" />
                           </div>
-                          
                           <div className="relative z-10 space-y-2">
                             <h3 className="text-lg font-black text-white">الدرس مغلق! 🔒</h3>
                             <p className="text-xs text-slate-300 font-bold max-w-sm mx-auto leading-relaxed">
                               اشترك الآن لمشاهدة المراجعة كاملة وفتح جميع المزايا ودروس المراجعة الحصرية مع حلول التجميعات.
                             </p>
                           </div>
-
-                          <button
-                            onClick={() => handlePurchase(review)}
-                            disabled={purchasing}
-                            className="relative z-10 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-2xl font-black text-xs transition-all shadow-lg cursor-pointer border-0 flex items-center gap-2"
-                          >
-                            {purchasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
-                            <span>شراء الآن بـ {displayPrice} ر.س</span>
-                          </button>
                         </div>
                       ) : (
-                        // ACTUAL UNLOCKED VIDEO PLAYER
-                        review.bunnyVideoId ? (
-                          <div className="absolute inset-0 w-full h-full">
+                        <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center">
+                          {review.bunnyVideoId ? (
                             <BunnyVideoPlayer videoId={review.bunnyVideoId} />
-                          </div>
-                        ) : activeLesson.videoUrl?.includes('tiktok.com') ? (
-                          <TikTokPlayer videoUrl={activeLesson.videoUrl} />
-                        ) : (activeLesson.videoUrl?.startsWith('/uploads/') || activeLesson.videoUrl?.includes('.mp4') || activeLesson.videoUrl?.includes('.webm')) ? (
-                          <video
-                            src={activeLesson.videoUrl}
-                            className="w-full h-full object-contain bg-black"
-                            controls
-                            playsInline
-                          />
-                        ) : (
-                          <iframe
-                            src={getEmbedUrl(activeLesson.videoUrl)}
-                            className="w-full h-full object-cover border-0"
-                            title={activeLesson.title}
-                            allowFullScreen
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          />
-                        )
+                          ) : activeLesson?.videoUrl?.includes('tiktok.com') ? (
+                            <TikTokPlayer videoUrl={activeLesson.videoUrl} />
+                          ) : activeLesson?.videoUrl ? (
+                            <iframe
+                              src={getEmbedUrl(activeLesson.videoUrl)}
+                              className="w-full h-full object-cover border-0"
+                              title={activeLesson.title || 'Video'}
+                              allowFullScreen
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            />
+                          ) : (
+                            <p className="text-white text-xs">لا يوجد فيديو</p>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    {/* Review Info Tab */}
+  ) : (
+    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-[#12121A] border border-gray-150 dark:border-[#2D2D3D] p-8 rounded-3xl shadow-xl min-h-[300px] mb-6">
+      <img src={selectedReview.promoImage || selectedReview.thumbnail} className="w-48 h-48 object-cover rounded-3xl shadow-lg mb-6" alt="Cover" />
+      <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{selectedReview.contentType === 'exam' ? 'اختبار إلكتروني' : 'ملف دراسي / مذكرة'}</h2>
+      <p className="text-sm text-gray-500 font-bold mb-6 text-center max-w-lg">{selectedReview.title}</p>
+      
+      {!purchased && selectedReview.price > 0 && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-500 px-4 py-2 rounded-xl text-xs font-bold border border-yellow-200 dark:border-yellow-900/30">
+          اشترك الآن للوصول إلى المحتوى
+        </div>
+      )}
+    </div>
+  )}
+  {/* Review Info Tab */}
                     <div className="bg-white dark:bg-[#1A1A24] border border-gray-150 dark:border-[#2D2D3D] rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-[#2D2D3D] pb-4">
                         <div className="space-y-1">
                           <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
                             {review.title}
                           </h1>
-                          <p className="text-xs text-gray-500 dark:text-slate-400 font-bold">
-                            الدرس النشط حالياً: {activeLesson.title}
-                          </p>
+                          {(!selectedReview.contentType || selectedReview.contentType === 'video_course') && (
+<p className="text-xs text-gray-500 dark:text-slate-400 font-bold">
+الدرس النشط حالياً: {activeLesson?.title}
+</p>
+)}
                         </div>
                         
                         <span className="px-3.5 py-1.5 bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 rounded-xl text-xs font-black shrink-0">
@@ -567,7 +697,14 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                             <button
                               onClick={() => {
                                 if (review.price === 0 || isPurchased(review)) {
-                                  window.open(review.pdfUrl, '_blank');
+                                  const link = document.createElement('a');
+                                  link.href = review.pdfUrl;
+                                  link.target = '_blank';
+                                  link.download = review.title || 'document';
+                                  link.rel = 'noopener noreferrer';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
                                 } else {
                                   toast.error('يجب شراء المراجعة أولاً لتحميل المذكرة 🔒');
                                 }
@@ -654,15 +791,15 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                               {discount ? (
                                 <>
                                   <span className="text-xl font-black text-yellow-300">
-                                    {review.discountPrice} ر.س
+                                    {review.discountPrice} ج.م
                                   </span>
                                   <span className="text-xs text-slate-400 line-through">
-                                    {review.price} ر.س
+                                    {review.price} ج.م
                                   </span>
                                 </>
                               ) : (
                                 <span className="text-xl font-black text-yellow-300">
-                                  {review.price === 0 ? 'مجاني' : `${review.price} ر.س`}
+                                  {review.price === 0 ? 'مجاني' : `${review.price} ج.م`}
                                 </span>
                               )}
                             </div>
@@ -672,16 +809,15 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
 
                         {/* Buy Button */}
                         <button
-                          onClick={() => handlePurchase(review)}
-                          disabled={purchasing}
-                          className="w-full py-4 bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 text-gray-900 rounded-2xl font-black text-xs transition-all shadow-lg hover:shadow-xl cursor-pointer border-0 flex items-center justify-center gap-2"
+                          onClick={() => handlePurchaseClick(review)}
+                          className="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-2xl font-black text-xs transition-all shadow-lg hover:shadow-xl cursor-pointer border-0 flex items-center justify-center gap-2"
                         >
-                          {purchasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                          <CreditCard className="w-4 h-4" />
                           <span>اشترك الآن وباشر التعلم</span>
                         </button>
 
                         <div className="text-center">
-                          <span className="text-[9.5px] text-slate-400 font-bold">رصيدك الحالي في المحفظة: {(userData?.balance || 0).toLocaleString('ar-EG')} ر.س</span>
+                          <span className="text-[9.5px] text-slate-400 font-bold">رصيدك الحالي في المحفظة: {(userData?.balance || 0).toLocaleString('ar-EG')} ج.م</span>
                         </div>
                       </div>
                     )}
@@ -800,6 +936,347 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
               </motion.div>
             );
           })()
+        )}
+      </AnimatePresence>
+
+      {/* Payment Modal */}
+      <AnimatePresence>
+        {showPaymentModal && selectedReview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-[#1A1A24] rounded-3xl w-full max-w-lg shadow-2xl border border-gray-150 dark:border-[#2D2D3D] flex flex-col overflow-hidden max-h-[90vh]"
+              dir="rtl"
+            >
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-gray-100 dark:border-[#2D2D3D] bg-gray-50/50 dark:bg-[#1C1C28]/50">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-100 dark:bg-purple-950/40 rounded-xl text-purple-600 dark:text-purple-400">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-gray-900 dark:text-white">طرق الاشتراك المتاحة</h3>
+                      <p className="text-[10px] font-bold text-gray-400">اختر الوسيلة المناسبة لك لتفعيل المراجعة</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#2D2D3D] rounded-full transition-colors text-gray-500 cursor-pointer bg-transparent border-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Method Selector Tabs */}
+                <div className="flex p-1 bg-gray-100 dark:bg-[#0D0D12] rounded-2xl border border-gray-200 dark:border-[#2D2D3D]">
+                  <button
+                    onClick={() => setPaymentMethod('wallet')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${
+                      paymentMethod === 'wallet' 
+                        ? 'bg-white dark:bg-[#1A1A24] text-purple-600 dark:text-purple-400 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    <Wallet className="w-4 h-4" />
+                    رصيد المحفظة
+                  </button>
+                  
+                  {(isVodafoneCashEnabled || isInstapayEnabled || isBankAccountEnabled) && (
+                    <button
+                      onClick={() => setPaymentMethod('vodafone')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${
+                        paymentMethod === 'vodafone' 
+                          ? 'bg-white dark:bg-[#1A1A24] text-rose-500 shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <span className="text-base">💰</span>
+                      تحويل مباشر
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto">
+                {!userData ? (
+                  <div className="p-10 text-center space-y-6">
+                    <div className="w-20 h-20 bg-purple-50 dark:bg-purple-950/20 rounded-full flex items-center justify-center mx-auto text-purple-600">
+                      <Lock className="w-10 h-10" />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-lg font-black text-gray-900 dark:text-white">يجب تسجيل الدخول أولاً</h4>
+                      <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed max-w-xs mx-auto">
+                        للاشتراك في المراجعة وتفعيلها على حسابك، يرجى تسجيل الدخول أو إنشاء حساب جديد.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => navigate('/login')}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-black text-xs shadow-md border-0 cursor-pointer"
+                      >
+                        تسجيل الدخول
+                      </button>
+                      <button
+                        onClick={() => navigate('/register')}
+                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-black text-xs border-0 cursor-pointer"
+                      >
+                        إنشاء حساب جديد
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <AnimatePresence mode="wait">
+                    {paymentMethod === 'wallet' ? (
+                    <motion.div
+                      key="wallet-tab"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="p-6 space-y-6"
+                    >
+                      <div className="bg-purple-50/50 dark:bg-purple-950/10 border border-purple-100 dark:border-purple-900/30 rounded-3xl p-6 text-center space-y-4">
+                        <div className="w-16 h-16 bg-white dark:bg-[#0D0D12] rounded-2xl flex items-center justify-center mx-auto shadow-sm border border-purple-100 dark:border-purple-900/30">
+                          <Wallet className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-500 dark:text-gray-400">رصيدك الحالي في المحفظة</p>
+                          <h4 className="text-3xl font-black text-gray-900 dark:text-white font-sans mt-1">
+                            {userData?.balance || 0} <span className="text-sm font-bold opacity-60">ج.م</span>
+                          </h4>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-[#0D0D12] border border-gray-100 dark:border-[#2D2D3D]">
+                          <span className="text-xs font-bold text-gray-500">سعر المراجعة:</span>
+                          <span className="text-sm font-black text-gray-900 dark:text-white">
+                            {selectedReview.discountPrice || selectedReview.price} ج.م
+                          </span>
+                        </div>
+
+                        {userData && (userData.balance || 0) < (selectedReview.discountPrice || selectedReview.price || 0) ? (
+                          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 flex gap-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-500 shrink-0" />
+                            <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 leading-relaxed">
+                              عذراً، رصيدك الحالي لا يكفي لإتمام عملية الشراء. يرجى شحن محفظتك أولاً أو استخدام طريقة دفع أخرى.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 flex gap-3">
+                            <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-500 shrink-0" />
+                            <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                              رصيدك كافٍ! سيتم تفعيل المراجعة فوراً عند تأكيد العملية وخصم المبلغ من محفظتك.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-4 flex flex-col gap-3">
+                        <button
+                          onClick={handleWalletPayment}
+                          disabled={isPayingWithWallet || (userData?.balance || 0) < (selectedReview.discountPrice || selectedReview.price || 0)}
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
+                        >
+                          {isPayingWithWallet ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>جاري إتمام الدفع...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4 stroke-[3px]" />
+                              <span>تأكيد الدفع والاشتراك الآن</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="vodafone-tab"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                    >
+                      {/* Form */}
+                      <form onSubmit={handlePaymentSubmit} className="p-6 space-y-5">
+                        {/* Manual Payment Details */}
+                        <div className="bg-gray-50/50 dark:bg-[#0D0D12]/50 border border-gray-100 dark:border-[#2D2D3D] rounded-2xl p-4 space-y-4">
+                          <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#2D2D3D] pb-3">
+                            <span className="text-xs font-black text-gray-700 dark:text-gray-300">طرق الدفع المتاحة للتحويل المباشر:</span>
+                            <span className="text-[11px] font-black bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 px-2 py-0.5 rounded-lg font-sans">
+                              {selectedReview.discountPrice || selectedReview.price} ج.م
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {isVodafoneCashEnabled && vodafoneCashNumber && (
+                              <div className="flex flex-col gap-2 bg-white dark:bg-[#12121A] border border-rose-100 dark:border-rose-950/30 rounded-xl p-3">
+                                <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400">فودافون كاش (Vodafone Cash)</span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-base font-black text-gray-900 dark:text-white font-sans tracking-wider" dir="ltr">
+                                    {vodafoneCashNumber}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={handleCopyNumber}
+                                    className="p-2 bg-gray-50 hover:bg-rose-50 dark:bg-[#1A1A24] dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-lg transition-all active:scale-95 border border-gray-100 dark:border-[#2D2D3D]"
+                                  >
+                                    {copiedNumber ? <Check className="w-4 h-4 stroke-[3px]" /> : <Copy className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {isInstapayEnabled && instapayHandle && (
+                              <div className="flex flex-col gap-2 bg-white dark:bg-[#12121A] border border-purple-100 dark:border-purple-900/30 rounded-xl p-3">
+                                <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400">حساب إنستاباي (Instapay)</span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-black text-gray-900 dark:text-white font-sans tracking-wider" dir="ltr">
+                                    {instapayHandle}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyText(instapayHandle)}
+                                    className="p-2 bg-gray-50 hover:bg-purple-50 dark:bg-[#1A1A24] dark:hover:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-lg transition-all active:scale-95 border border-gray-100 dark:border-[#2D2D3D]"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {isBankAccountEnabled && bankAccountDetails && (
+                              <div className="flex flex-col gap-2 bg-white dark:bg-[#12121A] border border-blue-100 dark:border-blue-900/30 rounded-xl p-3">
+                                <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">تحويل بنكي (Bank Transfer)</span>
+                                <div className="flex items-start justify-between">
+                                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                    {bankAccountDetails}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyText(bankAccountDetails)}
+                                    className="p-2 bg-gray-50 hover:bg-blue-50 dark:bg-[#1A1A24] dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg transition-all active:scale-95 border border-gray-100 dark:border-[#2D2D3D] shrink-0 mr-3"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <p className="text-[10.5px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed text-right mt-4">
+                            ⚠️ يرجى تحويل مبلغ المراجعة كاملاً وهو <span className="font-extrabold text-rose-600 dark:text-rose-400">{selectedReview.discountPrice || selectedReview.price} ج.م</span> إلى إحدى الطرق الموضحة أعلاه، ثم ملء البيانات أدناه لرفع إثبات التحويل لتفعيل المراجعة.
+                          </p>
+                        </div>
+
+                        {/* Sender Full Name */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-black text-gray-700 dark:text-gray-200 block">اسمك بالكامل (اسم الطالب):</label>
+                          <input
+                            type="text"
+                            required
+                            value={paymentSenderName}
+                            onChange={(e) => setPaymentSenderName(e.target.value)}
+                            placeholder="أدخل اسمك ثلاثياً أو رباعياً لسهولة المطابقة..."
+                            className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-3 outline-none focus:border-purple-600 dark:text-white font-bold text-xs font-sans"
+                          />
+                        </div>
+
+                        {/* Sender Phone Number */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-black text-gray-700 dark:text-gray-200 block">رقم الهاتف المحول منه (محفظة التحويل):</label>
+                          <input
+                            type="tel"
+                            required
+                            value={paymentSenderPhone}
+                            onChange={(e) => setPaymentSenderPhone(e.target.value)}
+                            placeholder="مثال: 01012345678"
+                            className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-3 outline-none focus:border-purple-600 dark:text-white font-bold text-xs font-sans text-right"
+                            dir="ltr"
+                          />
+                        </div>
+
+                        {/* Screenshot Upload */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-black text-gray-700 dark:text-gray-200 block">إرفاق لقطة شاشة التحويل (إسكرين الإثبات):</label>
+                          <div 
+                            onClick={() => {
+                              const el = document.getElementById('payment-screenshot-input');
+                              el?.click();
+                            }}
+                            className="w-full h-40 border-2 border-dashed border-gray-300 dark:border-[#2D2D3D] rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-[#13131C] transition-all relative overflow-hidden p-4 group"
+                          >
+                            {paymentScreenshotPreview ? (
+                              <div className="w-full h-full relative">
+                                <img 
+                                  src={paymentScreenshotPreview} 
+                                  alt="إسكرين التحويل" 
+                                  className="w-full h-full object-contain"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-black gap-1.5">
+                                  <Upload className="w-4 h-4" /> تغيير الصورة
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center text-gray-500 dark:text-gray-400">
+                                <div className="p-3 bg-gray-100 dark:bg-[#1A1A24] rounded-2xl mb-2 text-rose-500">
+                                  <Upload className="w-6 h-6" />
+                                </div>
+                                <span className="text-xs font-black text-gray-700 dark:text-gray-300">اضغط لرفع لقطة الشاشة</span>
+                                <span className="text-[10px] text-gray-400 mt-1">يُقبل الصور (PNG, JPG, JPEG)</span>
+                              </div>
+                            )}
+                            <input
+                              id="payment-screenshot-input"
+                              type="file"
+                              accept="image/*"
+                              onChange={handleScreenshotChange}
+                              className="hidden"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-[#2D2D3D]">
+                          <button
+                            type="button"
+                            onClick={() => setShowPaymentModal(false)}
+                            className="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-[#2D2D3D] hover:bg-gray-100 dark:hover:bg-[#222230] text-gray-700 dark:text-gray-300 text-xs font-black transition-colors cursor-pointer bg-transparent"
+                          >
+                            إلغاء
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={submittingPayment}
+                            className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl font-black text-xs shadow-md disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 border-0"
+                          >
+                            {submittingPayment ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>جاري إرسال الطلب...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check className="w-3.5 h-3.5 stroke-[3px]" />
+                                <span>تأكيد التحويل وإرسال الطلب</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

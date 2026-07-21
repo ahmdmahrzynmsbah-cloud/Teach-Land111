@@ -43,7 +43,13 @@ export const defaultSettings: PlatformSettings = {
     youtube: '#',
     instagram: '#'
   },
-  logoUrl: ''
+  logoUrl: '',
+  quduratVideoUrl: '',
+  tahsiliVideoUrl: '',
+  quduratVideoProvider: 'youtube',
+  tahsiliVideoProvider: 'youtube',
+  quduratVideoTitle: 'الفيديو التعريفي لمسار القدرات 🎯',
+  tahsiliVideoTitle: 'الفيديو التعريفي لمسار التحصيلي 🚀'
 };
 
 interface PlatformSettingsContextType {

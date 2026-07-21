@@ -133,6 +133,12 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    // 16b. Review Payments collection
+    match /review_payments/{paymentId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     // 17. Recharge Codes collection
     match /recharge_codes/{codeId} {
       allow read, write: if isAdmin();
@@ -160,6 +166,12 @@ service cloud.firestore {
       allow create: if isAdmin() || isTeacher();
       allow update: if isSignedIn();
       allow delete: if isAdmin() || isTeacher();
+    }
+    
+    // 26. Question Banks collection
+    match /questionBanks/{bankId} {
+      allow read: if isTeacher() || isAdmin();
+      allow write: if isTeacher() || isAdmin();
     }
 
     // 20. Secret Links Log collection

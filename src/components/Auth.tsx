@@ -60,8 +60,13 @@ export default function Auth() {
     setError('');
     setLoading(true);
     const formData = new FormData(e.currentTarget);
-    const email = (formData.get('email') as string || '').trim().toLowerCase();
+    let email = (formData.get('email') as string || '').trim().toLowerCase();
     const password = (formData.get('password') as string || '').trim();
+
+    // If login input is a phone number, convert to the special registration email format
+    if (/^[0-9]+$/.test(email) && email.startsWith('01') && email.length === 11) {
+      email = `${email}@tafawwoq.app`;
+    }
 
     try {
       if (isLogin) {
@@ -249,8 +254,8 @@ export default function Auth() {
     } catch (err: any) {
       if (err.code === 'auth/operation-not-allowed') {
         setError('عذراً، لم يتم تفعيل الدخول بالبريد الإلكتروني في قاعدة البيانات. (يجب تفعيل Email/Password من لوحة تحكم Firebase)');
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('هذا البريد الإلكتروني مسجل بالفعل، يرجى تسجيل الدخول.');
+      } else if (err.code === 'auth/email-already-in-use' || (err.message && err.message.includes('email-already-in-use'))) {
+        setError('هذا البريد الإلكتروني أو رقم الهاتف مسجل بالفعل في المنصة، يرجى تسجيل الدخول مباشرة.');
       } else if (err.code === 'auth/weak-password') {
         setError('كلمة المرور ضعيفة، يجب أن تكون 6 أحرف على الأقل.');
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
@@ -690,10 +695,19 @@ export default function Auth() {
             </AnimatePresence>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block">البريد الإلكتروني</label>
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block">
+                {isLogin ? 'البريد الإلكتروني أو رقم الهاتف' : 'البريد الإلكتروني'}
+              </label>
               <div className="relative">
                 <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
-                <input name="email" required type="email" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" placeholder="email@example.com" dir="ltr" />
+                <input 
+                  name="email" 
+                  required 
+                  type={isLogin ? "text" : "email"} 
+                  className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" 
+                  placeholder={isLogin ? "example@email.com أو 01XXXXXXXXX" : "email@example.com"} 
+                  dir="ltr" 
+                />
               </div>
             </div>
             

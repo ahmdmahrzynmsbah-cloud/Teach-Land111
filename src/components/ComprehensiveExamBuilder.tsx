@@ -2,7 +2,7 @@ import React from "react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, Trash2, Save, Clock, BookOpen, AlertCircle, Sparkles } from "lucide-react";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, query, where, updateDoc } from "firebase/firestore";
 import { toast } from "react-hot-toast";
 
 export type QuestionType = 'multiple_choice' | 'true_false' | 'essay';
@@ -16,6 +16,7 @@ interface Question {
   correctAnswer?: string;
   points: number;
   explanation?: string;
+  originalBankQuestionId?: string;
 }
 
 interface ComprehensiveExamBuilderProps {
@@ -51,6 +52,17 @@ export default function ComprehensiveExamBuilder({
   const [saving, setSaving] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
 
+  // Question Bank import states
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [banksList, setBanksList] = useState<any[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState('');
+  const [numQuestionsToImport, setNumQuestionsToImport] = useState(5);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [pastUsedQuestionIds, setPastUsedQuestionIds] = useState<Set<string>>(new Set());
+  const [excludeUsedQuestions, setExcludeUsedQuestions] = useState(true);
+  const [importMode, setImportMode] = useState<'random' | 'manual'>('random');
+  const [selectedManualQuestionIds, setSelectedManualQuestionIds] = useState<Set<string>>(new Set());
+
   // Load existing exam data if editing
   useEffect(() => {
     if (editingExamId && existingExamData) {
@@ -78,6 +90,92 @@ export default function ComprehensiveExamBuilder({
       ]);
     }
   }, [editingExamId, existingExamData, isOpen]);
+
+  const openBankModal = async () => {
+    setShowBankModal(true);
+    if (banksList.length === 0) {
+      setLoadingBanks(true);
+      try {
+        const q = query(collection(db, 'questionBanks'), where('teacherId', '==', userData.id));
+        const snap = await getDocs(q);
+        setBanksList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        
+        // Load past used question IDs from quizzes
+        const quizzesQ = query(collection(db, 'quizzes'), where('createdBy', '==', userData.id));
+        const quizzesSnap = await getDocs(quizzesQ);
+        const usedIds = new Set<string>();
+        quizzesSnap.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.questions) {
+            data.questions.forEach((q: any) => {
+              if (q.originalBankQuestionId) {
+                usedIds.add(q.originalBankQuestionId);
+              }
+            });
+          }
+        });
+        setPastUsedQuestionIds(usedIds);
+      } catch (err) {
+        console.error(err);
+        toast.error('حدث خطأ أثناء تحميل بنوك الأسئلة');
+      } finally {
+        setLoadingBanks(false);
+      }
+    }
+  };
+
+  const handleImportFromBank = () => {
+    const bank = banksList.find(b => b.id === selectedBankId);
+    if (!bank) return toast.error('يرجى اختيار بنك الأسئلة');
+    
+    let availableQuestions = bank.questions || [];
+    let selected: any[] = [];
+    
+    if (importMode === 'random') {
+      if (excludeUsedQuestions) {
+        availableQuestions = availableQuestions.filter((q: any) => !pastUsedQuestionIds.has(q.id));
+      }
+      
+      if (availableQuestions.length === 0) {
+        return toast.error('لا يوجد أسئلة متاحة للاستيراد بهذه الشروط');
+      }
+      
+      if (availableQuestions.length < numQuestionsToImport) {
+        toast.error(`يوجد ${availableQuestions.length} سؤال متاح فقط، سيتم استيرادهم جميعاً`);
+      }
+      
+      // Shuffle and pick
+      const shuffled = [...availableQuestions].sort(() => 0.5 - Math.random());
+      selected = shuffled.slice(0, numQuestionsToImport);
+    } else {
+      selected = availableQuestions.filter((q: any) => selectedManualQuestionIds.has(q.id));
+      if (selected.length === 0) {
+        return toast.error('يرجى تحديد سؤال واحد على الأقل');
+      }
+    }
+    
+    const formattedQuestions = selected.map((q: any) => ({
+      id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      originalBankQuestionId: q.id,
+      text: q.text,
+      options: q.options || ["", "", "", ""],
+      correctOptionIndex: q.correctAnswer || 0,
+      points: 1,
+      explanation: q.explanation || "",
+      type: 'multiple_choice' as QuestionType
+    }));
+    
+    setQuestions(prev => {
+      // If we only have the default empty question, replace it
+      if (prev.length === 1 && !prev[0].text && prev[0].options.every(o => !o)) {
+        return formattedQuestions;
+      }
+      return [...prev, ...formattedQuestions];
+    });
+    
+    setShowBankModal(false);
+    toast.success(`تم استيراد ${selected.length} سؤال بنجاح 🎉`);
+  };
 
   const handleAddQuestion = (type: QuestionType = 'multiple_choice') => {
     const newId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -322,6 +420,15 @@ export default function ComprehensiveExamBuilder({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
+                    onClick={openBankModal}
+                    className="px-3 py-2 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-emerald-500/20"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    استيراد من بنك الأسئلة
+                  </button>
+                  <div className="w-px h-6 bg-gray-200 dark:bg-[#2D2D3D] mx-1"></div>
+                  <button
+                    type="button"
                     onClick={() => handleAddQuestion('multiple_choice')}
                     className="px-3 py-2 bg-[#00B4D8]/10 text-[#00B4D8] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] hover:bg-[#00B4D8]/20 rounded-xl text-xs font-black transition-all flex items-center gap-1.5"
                   >
@@ -523,6 +630,181 @@ export default function ComprehensiveExamBuilder({
             </div>
           </div>
         </motion.div>
+
+        <AnimatePresence>
+          {showBankModal && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" dir="rtl">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white dark:bg-[#1A1A24] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+              >
+                <div className="p-5 border-b border-gray-100 dark:border-[#2D2D3D] flex items-center justify-between bg-gray-50/50 dark:bg-[#0D0D12]/30 shrink-0">
+                  <h3 className="font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-emerald-500" />
+                    <span>استيراد من بنك الأسئلة</span>
+                  </h3>
+                  <button onClick={() => setShowBankModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2D2D3D]">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto space-y-5">
+                  {loadingBanks ? (
+                    <div className="py-10 text-center text-gray-500 font-bold text-sm">جاري التحميل...</div>
+                  ) : banksList.length === 0 ? (
+                    <div className="py-10 text-center text-gray-500 font-bold text-sm">لا يوجد لديك بنوك أسئلة حالياً.</div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-700 dark:text-gray-300">اختر بنك الأسئلة <span className="text-red-500">*</span></label>
+                        <select
+                          value={selectedBankId}
+                          onChange={e => {
+                            setSelectedBankId(e.target.value);
+                            setSelectedManualQuestionIds(new Set());
+                          }}
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="" disabled>-- اختر من بنوك الأسئلة --</option>
+                          {banksList.map(b => (
+                            <option key={b.id} value={b.id}>{b.title} ({b.questions?.length || 0} أسئلة)</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {selectedBankId && (
+                        <div className="flex p-1 bg-gray-100 dark:bg-[#0D0D12] rounded-xl mb-4">
+                          <button
+                            type="button"
+                            onClick={() => setImportMode('random')}
+                            className={`flex-1 py-2 px-3 text-xs font-black rounded-lg transition-all ${importMode === 'random' ? 'bg-white dark:bg-[#2D2D3D] text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          >
+                            اختيار عشوائي
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImportMode('manual')}
+                            className={`flex-1 py-2 px-3 text-xs font-black rounded-lg transition-all ${importMode === 'manual' ? 'bg-white dark:bg-[#2D2D3D] text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          >
+                            تحديد يدوي
+                          </button>
+                        </div>
+                      )}
+
+                      {importMode === 'random' && selectedBankId ? (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-700 dark:text-gray-300">عدد الأسئلة المطلوبة</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={numQuestionsToImport}
+                              onChange={e => setNumQuestionsToImport(parseInt(e.target.value) || 1)}
+                              className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                            <input
+                              type="checkbox"
+                              id="excludeUsed"
+                              checked={excludeUsedQuestions}
+                              onChange={e => setExcludeUsedQuestions(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <label htmlFor="excludeUsed" className="text-xs font-bold text-blue-800 dark:text-blue-300 cursor-pointer">
+                              استبعاد الأسئلة التي تم استخدامها مسبقاً
+                            </label>
+                          </div>
+                        </>
+                      ) : importMode === 'manual' && selectedBankId ? (
+                        <div className="mt-4 border border-gray-200 dark:border-[#2D2D3D] rounded-xl overflow-hidden max-h-[300px] flex flex-col">
+                           <div className="p-3 bg-gray-50 dark:bg-[#0D0D12] border-b border-gray-200 dark:border-[#2D2D3D] flex justify-between items-center shrink-0">
+                             <span className="text-xs font-black text-gray-700 dark:text-gray-300">
+                               تم تحديد {selectedManualQuestionIds.size} سؤال
+                             </span>
+                             <button
+                               type="button"
+                               onClick={() => {
+                                  const bank = banksList.find(b => b.id === selectedBankId);
+                                  if (!bank) return;
+                                  if (selectedManualQuestionIds.size === bank.questions?.length) {
+                                    setSelectedManualQuestionIds(new Set());
+                                  } else {
+                                    setSelectedManualQuestionIds(new Set(bank.questions?.map((q: any) => q.id) || []));
+                                  }
+                               }}
+                               className="text-xs text-emerald-600 font-bold hover:underline"
+                             >
+                               {selectedManualQuestionIds.size === banksList.find(b => b.id === selectedBankId)?.questions?.length ? 'إلغاء التحديد' : 'تحديد الكل'}
+                             </button>
+                           </div>
+                           <div className="overflow-y-auto p-2 space-y-2">
+                             {banksList.find(b => b.id === selectedBankId)?.questions?.map((q: any, idx: number) => (
+                               <div 
+                                 key={q.id}
+                                 onClick={() => {
+                                   const newSet = new Set(selectedManualQuestionIds);
+                                   if (newSet.has(q.id)) newSet.delete(q.id);
+                                   else newSet.add(q.id);
+                                   setSelectedManualQuestionIds(newSet);
+                                 }}
+                                 className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedManualQuestionIds.has(q.id) ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-100 dark:border-[#2D2D3D] hover:bg-gray-50 dark:hover:bg-[#1A1A24]'}`}
+                               >
+                                 <input
+                                   type="checkbox"
+                                   checked={selectedManualQuestionIds.has(q.id)}
+                                   readOnly
+                                   className="mt-1 shrink-0 w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500"
+                                 />
+                                 <div>
+                                   <p className="text-xs font-bold text-gray-800 dark:text-gray-200 line-clamp-2">{q.text}</p>
+                                   <div className="flex gap-2 mt-1">
+                                      <span className="text-[10px] text-gray-500 bg-white dark:bg-[#2D2D3D] px-1.5 py-0.5 rounded border border-gray-100 dark:border-gray-600">
+                                        سؤال {idx + 1}
+                                      </span>
+                                      {pastUsedQuestionIds.has(q.id) && (
+                                        <span className="text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded border border-orange-200 dark:border-orange-800">
+                                          مستخدم سابقاً
+                                        </span>
+                                      )}
+                                   </div>
+                                 </div>
+                               </div>
+                             ))}
+                             {(!banksList.find(b => b.id === selectedBankId)?.questions || banksList.find(b => b.id === selectedBankId)?.questions?.length === 0) && (
+                               <div className="text-center p-4 text-xs font-bold text-gray-500">لا يوجد أسئلة في هذا البنك</div>
+                             )}
+                           </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+
+                <div className="p-5 border-t border-gray-100 dark:border-[#2D2D3D] flex gap-3 shrink-0 bg-gray-50/50 dark:bg-[#0D0D12]/30">
+                  <button
+                    type="button"
+                    onClick={() => setShowBankModal(false)}
+                    className="flex-1 px-4 py-3 bg-gray-200 dark:bg-[#2D2D3D] text-gray-700 dark:text-gray-300 rounded-xl text-sm font-black hover:bg-gray-300 dark:hover:bg-[#3D3D4D] transition-all cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImportFromBank}
+                    disabled={loadingBanks || !selectedBankId || (importMode === 'manual' && selectedManualQuestionIds.size === 0)}
+                    className="flex-[2] px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-black hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    <span>{importMode === 'manual' ? `استيراد المحدد (${selectedManualQuestionIds.size})` : 'استيراد عشوائي الآن'}</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </AnimatePresence>
   );

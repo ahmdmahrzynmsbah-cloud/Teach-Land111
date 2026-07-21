@@ -131,3 +131,35 @@
     margin: 15mm;
   }
 }
+
+@media print {
+  /* Hide unnecessary UI elements */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Show only the printable area */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  
+  /* Reset positioning for print */
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Ensure colors print correctly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

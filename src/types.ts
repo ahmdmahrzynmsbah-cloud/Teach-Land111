@@ -31,6 +31,12 @@ export interface PlatformSettings {
     instagram?: string;
     whatsapp?: string;
   };
+  quduratVideoUrl?: string;
+  tahsiliVideoUrl?: string;
+  quduratVideoProvider?: 'bunny' | 'tiktok' | 'youtube' | 'direct';
+  tahsiliVideoProvider?: 'bunny' | 'tiktok' | 'youtube' | 'direct';
+  quduratVideoTitle?: string;
+  tahsiliVideoTitle?: string;
 }
 
 export interface User {
@@ -52,6 +58,10 @@ export interface User {
   createdAt?: string;
   branch?: 'science' | 'math' | 'arts' | 'scientific' | 'literary';
   educationSystem?: 'general' | 'azhar';
+  isSpecialRegistration?: boolean;
+  status?: string;
+  registrationType?: string;
+  isApproved?: boolean;
 }
 
 export interface Course {
@@ -80,6 +90,7 @@ export interface Lesson {
   title: string;
   description: string;
   videoUrl: string;
+  contentType?: 'video_course' | 'pdf_book' | 'exam';
   bunnyVideoId?: string;
   order: number;
   createdAt: string;
@@ -217,6 +228,7 @@ export interface FocusSession {
 }
 
 export interface TahsiliReview {
+  contentType?: 'video_course' | 'pdf_book' | 'exam';
   id: string;
   title: string;
   description: string;
@@ -242,6 +254,7 @@ export interface TahsiliReview {
 }
 
 export interface QuduratReview {
+  contentType?: 'video_course' | 'pdf_book' | 'exam';
   id: string;
   title: string;
   description: string;

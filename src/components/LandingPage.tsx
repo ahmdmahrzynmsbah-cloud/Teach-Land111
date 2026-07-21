@@ -3,13 +3,17 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowRight, BookOpen, GraduationCap, Play, Star, Users, Trophy, Award, ChevronDown, CheckCircle2, 
   Sparkles, Mail, Send, CheckCircle, ArrowUpRight, Shield, Heart, Zap, Phone, MapPin, MessageSquare,
-  Calculator, FlaskConical, Dna, Languages, BookOpenText, Scroll, Globe, X, TrendingUp, Menu, Film
+  Calculator, FlaskConical, Dna, Languages, BookOpenText, Scroll, Globe, X, TrendingUp, Menu, Film, Download
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import PremiumFeaturesSection from './PremiumFeaturesSection';
 import StudentTahsili from './StudentTahsili';
 import StudentQudurat from './StudentQudurat';
+import BunnyVideoPlayer from './BunnyVideoPlayer';
+import TikTokPlayer from './TikTokPlayer';
+import CleanYoutubePlayer from './CleanYoutubePlayer';
+import InstallAppModal from './InstallAppModal';
 import LatestCoursesSection from './LatestCoursesSection';
 import { usePlatformSettings } from '../context/PlatformSettingsContext';
 import { auth, db } from '../lib/firebase';
@@ -76,6 +80,25 @@ const _0x1a2b = () => {
 export default function LandingPage() {
   const { settings } = usePlatformSettings();
   const navigate = useNavigate();
+
+  const getYoutubeEmbedUrl = (url: string) => {
+    if (!url) return '';
+    try {
+      if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+        const videoId = url.includes('youtu.be/') 
+          ? url.split('youtu.be/')[1].split('?')[0] 
+          : new URL(url).searchParams.get('v');
+        return `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&iv_load_policy=3`;
+      }
+      if (url.includes('youtube.com/embed/')) {
+        const separator = url.includes('?') ? '&' : '?';
+        return `${url}${separator}modestbranding=1&rel=0&iv_load_policy=3`;
+      }
+      return url;
+    } catch {
+      return url;
+    }
+  };
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
@@ -83,6 +106,7 @@ export default function LandingPage() {
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
@@ -210,6 +234,7 @@ export default function LandingPage() {
             <a href="#grades" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">الصفوف الدراسية</a>
             <a href="#subjects" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">المواد الدراسية</a>
             <a href="#tahsili" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">التحصيلي</a>
+            <a href="#qudurat" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">القدرات</a>
             <a href="#how-it-works" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">مميزات المنصة</a>
             <a href="#faq" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">الأسئلة الشائعة</a>
           </div>
@@ -498,6 +523,9 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             {(settings.subjects || []).map((subject, i) => {
               const IconComponent = IconMap[subject.iconName] || LucideIcons.BookOpen;
+              const isQuduratTahsili = subject.title?.includes('القدرات') || subject.title?.includes('التحصيلي');
+              const subType = subject.title?.includes('القدرات') ? 'qudurat' : 'tahsili';
+
               return (
                 <motion.div
                   key={subject.id || i}
@@ -507,7 +535,11 @@ export default function LandingPage() {
                   transition={{ duration: 0.4, delay: i * 0.05 }}
                   onClick={() => {
                     if (!user) {
-                      navigate('/register');
+                      if (isQuduratTahsili) {
+                        navigate(`/special-register?type=${subType}`);
+                      } else {
+                        navigate('/register');
+                      }
                     } else {
                       navigate('/dashboard?tab=subjects&subject=' + encodeURIComponent(subject.title));
                     }
@@ -545,6 +577,94 @@ export default function LandingPage() {
             </p>
           </div>
 
+          {/* Qudurat Intro Video Showcase */}
+          {settings.quduratVideoUrl && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="mb-16 max-w-5xl mx-auto bg-white dark:bg-[#111118]/80 backdrop-blur-xl rounded-[2rem] border border-gray-200/60 dark:border-white/5 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 sm:p-8 relative"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              {/* Left Column: Video Player Container */}
+              <div className="lg:col-span-7 xl:col-span-8 relative rounded-2xl overflow-hidden bg-black aspect-video shadow-lg border border-gray-100 dark:border-white/5 group">
+                {settings.quduratVideoProvider === 'youtube' && (
+                  <CleanYoutubePlayer 
+                    videoUrl={settings.quduratVideoUrl} 
+                    title={settings.quduratVideoTitle} 
+                  />
+                )}
+                {settings.quduratVideoProvider === 'tiktok' && (
+                  <TikTokPlayer videoUrl={settings.quduratVideoUrl} />
+                )}
+                {settings.quduratVideoProvider === 'bunny' && (
+                  <BunnyVideoPlayer videoId={settings.quduratVideoUrl} />
+                )}
+                {settings.quduratVideoProvider === 'direct' && (
+                  <video 
+                    src={settings.quduratVideoUrl} 
+                    controls 
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+              </div>
+
+              {/* Right Column: Dynamic Content & Call to Action */}
+              <div className="lg:col-span-5 xl:col-span-4 flex flex-col justify-center space-y-5">
+                <div className="space-y-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>مقدمة المسار التعريفي</span>
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white leading-tight">
+                    {settings.quduratVideoTitle || 'شاهد الفيديو التعريفي لمسار القدرات 🎯'}
+                  </h3>
+                </div>
+
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                  شاهد الشرح التعريفي الحصري لتتعرف على طريقتنا المبتكرة في تبسيط القدرات وحل أعقد المسائل في ثوانٍ معدودة وبأسهل الطرق الذكية.
+                </p>
+
+                <div className="space-y-3 pt-1">
+                  {[
+                    "شرح تكتيكات الحل السريع للكمي واللفظي",
+                    "أحدث التجميعات المحوسبة والورقية لعام 1447هـ",
+                    "نماذج محاكاة للاختبار الحقيقي بدقة متناهية"
+                  ].map((bullet, idx) => (
+                    <div key={idx} className="flex items-center gap-2.5 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      </div>
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/15 hover:shadow-emerald-600/25 hover:-translate-y-0.5 transition-all text-center"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const el = document.getElementById('qudurat-reviews-list') || document.getElementById('qudurat');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                      } else {
+                        // Scroll down a bit to the course elements
+                        window.scrollBy({ top: 400, behavior: 'smooth' });
+                      }
+                    }}
+                  >
+                    <span>عرض باقات ومراجعات القدرات</span>
+                    <ArrowRight className="w-4 h-4 rotate-90" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           <StudentQudurat userData={userData} setUserData={setUserData} />
         </div>
       </section>
@@ -570,6 +690,93 @@ export default function LandingPage() {
               مستقبلك يبدأ من هنا. مراجعات فيديو مكثفة ومصممة بدقة متناهية بأحدث تجميعات التحصيلي، يقدمها نخبة من أفضل المعلمين لمساعدتك على تأمين نسبة +95٪ بإذن الله.
             </p>
           </div>
+
+          {/* Tahsili Intro Video Showcase */}
+          {settings.tahsiliVideoUrl && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="mb-16 max-w-5xl mx-auto bg-white dark:bg-[#111118]/80 backdrop-blur-xl rounded-[2rem] border border-gray-200/60 dark:border-white/5 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 sm:p-8 relative"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              {/* Left Column: Video Player Container */}
+              <div className="lg:col-span-7 xl:col-span-8 relative rounded-2xl overflow-hidden bg-black aspect-video shadow-lg border border-gray-100 dark:border-white/5 group">
+                {settings.tahsiliVideoProvider === 'youtube' && (
+                  <CleanYoutubePlayer 
+                    videoUrl={settings.tahsiliVideoUrl} 
+                    title={settings.tahsiliVideoTitle} 
+                  />
+                )}
+                {settings.tahsiliVideoProvider === 'tiktok' && (
+                  <TikTokPlayer videoUrl={settings.tahsiliVideoUrl} />
+                )}
+                {settings.tahsiliVideoProvider === 'bunny' && (
+                  <BunnyVideoPlayer videoId={settings.tahsiliVideoUrl} />
+                )}
+                {settings.tahsiliVideoProvider === 'direct' && (
+                  <video 
+                    src={settings.tahsiliVideoUrl} 
+                    controls 
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+              </div>
+
+              {/* Right Column: Dynamic Content & Call to Action */}
+              <div className="lg:col-span-5 xl:col-span-4 flex flex-col justify-center space-y-5">
+                <div className="space-y-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>مقدمة المسار التعريفي</span>
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white leading-tight">
+                    {settings.tahsiliVideoTitle || 'شاهد الفيديو التعريفي لمسار التحصيلي 🚀'}
+                  </h3>
+                </div>
+
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                  شاهد الشرح التعريفي لتتعرف على خريطة الطريق الذهبية لاجتياز اختبار التحصيلي والوصول للقبول الجامعي المباشر بكل سهولة ويسر.
+                </p>
+
+                <div className="space-y-3 pt-1">
+                  {[
+                    "تغطية شاملة لكل من الرياضيات، الفيزياء، الكيمياء، والأحياء",
+                    "ربط ذكي ومبتكر للمفاهيم يمنع النسيان تماماً",
+                    "حلول ومناقشة التجميعات التاريخية والأحدث تفصيلياً"
+                  ].map((bullet, idx) => (
+                    <div key={idx} className="flex items-center gap-2.5 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300">
+                      <div className="w-5 h-5 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      </div>
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black text-sm px-6 py-3 rounded-xl shadow-lg shadow-purple-600/15 hover:shadow-purple-600/25 hover:-translate-y-0.5 transition-all text-center"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const el = document.getElementById('tahsili-reviews-list') || document.getElementById('tahsili');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                      } else {
+                        window.scrollBy({ top: 400, behavior: 'smooth' });
+                      }
+                    }}
+                  >
+                    <span>عرض باقات ومراجعات التحصيلي</span>
+                    <ArrowRight className="w-4 h-4 rotate-90" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           <StudentTahsili userData={userData} setUserData={setUserData} />
         </div>
@@ -1120,6 +1327,10 @@ export default function LandingPage() {
           </div>
         )}
 
+      <InstallAppModal 
+        isOpen={isInstallModalOpen} 
+        onClose={() => setIsInstallModalOpen(false)} 
+      />
     </div>
   );
 }

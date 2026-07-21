@@ -1,7 +1,7 @@
 import React from "react";
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, HelpCircle, Lock, BookOpen, Star, MessageCircleQuestion, CheckCircle, Ticket, LogOut, Trophy, Flame, Bell, Target, ArrowLeft, Video, Bot, Users, Activity, User as UserIcon, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, CreditCard, PiggyBank, RefreshCw, Send, Sparkles, Loader2, DollarSign, Check, History, Award, Edit2, Edit3, Save, X, Clock, Trash2, Plus , Shield, Info, Menu, ChevronRight, ChevronLeft, Film, FileText, Copy, Search } from 'lucide-react';
+import { Play, ShoppingBag, HelpCircle, Lock, BookOpen, Star, MessageCircleQuestion, CheckCircle, Ticket, LogOut, Trophy, Flame, Bell, Target, ArrowLeft, Video, Bot, Users, Activity, User as UserIcon, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, CreditCard, PiggyBank, RefreshCw, Send, Sparkles, Loader2, DollarSign, Check, History, Award, Edit2, Edit3, Save, X, Clock, Trash2, Plus , Shield, Info, Menu, ChevronRight, ChevronLeft, Film, FileText, Copy, Search } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import ThemeToggle from './ThemeToggle';
@@ -33,7 +33,9 @@ import TeacherQudurat from './TeacherQudurat';
 import StudentQudurat from './StudentQudurat';
 import AcademyStoreAdmin from './AcademyStoreAdmin';
 import StudentStore from './StudentStore';
+import StudentPurchases from './StudentPurchases';
 import ParentInvoices from './ParentInvoices';
+import TeacherQuestionBank from './TeacherQuestionBank';
 
 const MOCK_TEACHER_STATS = [
   { id: 1, title: 'إجمالي الطلاب', value: '1,240', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
@@ -129,6 +131,7 @@ export default function Dashboard() {
         { id: 'home', label: 'الرئيسية', icon: Target },
         { id: 'classes', label: 'فصولي وإدارة الطلاب', icon: Users },
         { id: 'quizzes', label: 'إدارة الاختبارات والواجبات', icon: Award },
+        { id: 'question_bank', label: 'بنك الأسئلة', icon: BookOpen },
         { id: 'tahsili', label: 'التحصيلي', icon: Film },
         { id: 'qudurat', label: 'القدرات', icon: Film },
         { id: 'analytics', label: 'تحليلات الأداء المتقدمة', icon: Activity },
@@ -145,11 +148,46 @@ export default function Dashboard() {
         { id: 'profile', label: 'الملف الشخصي', icon: UserIcon },
       ];
     } else {
+      if (userData?.isSpecialRegistration) {
+        const isSubscribedToQudurat = publishedQuduratReviews.some(review => 
+          review.enrolledStudentIds?.includes(userData?.id)
+        );
+        const isSubscribedToTahsili = publishedTahsiliReviews.some(review => 
+          review.enrolledStudentIds?.includes(userData?.id)
+        );
+
+        const items = [
+          { id: 'home', label: 'الرئيسية', icon: Target },
+        ];
+
+        const hasAnySubscription = isSubscribedToQudurat || isSubscribedToTahsili;
+
+        if (hasAnySubscription) {
+          if (isSubscribedToTahsili) {
+            items.push({ id: 'tahsili', label: 'التحصيلي', icon: Film });
+          }
+          if (isSubscribedToQudurat) {
+            items.push({ id: 'qudurat', label: 'القدرات', icon: Film });
+          }
+        } else {
+          const regType = userData.registrationType || 'both';
+          if (regType === 'tahsili' || regType === 'both') {
+            items.push({ id: 'tahsili', label: 'التحصيلي', icon: Film });
+          }
+          if (regType === 'qudurat' || regType === 'both') {
+            items.push({ id: 'qudurat', label: 'القدرات', icon: Film });
+          }
+        }
+        items.push({ id: 'wallet', label: 'المحفظة الإلكترونية وشحن الرصيد', icon: Ticket });
+        items.push({ id: 'profile', label: 'الملف الشخصي', icon: UserIcon });
+        return items;
+      }
       const base = [
         { id: 'home', label: 'الرئيسية', icon: Target },
         { id: 'subjects', label: 'كورساتي', icon: BookOpen },
         { id: 'teachers_list', label: 'المعلمون', icon: Users },
-        { id: 'student_store', label: 'المتجر والمشتريات', icon: Edit3 },
+        { id: 'student_store', label: 'المتجر', icon: ShoppingBag },
+        { id: 'purchases', label: 'مشترياتي', icon: FileText },
       ];
       return [
         ...base,
@@ -183,6 +221,7 @@ export default function Dashboard() {
         { id: 'home', label: 'الرئيسية', icon: Target },
         { id: 'classes', label: 'فصولي', icon: Users },
         { id: 'quizzes', label: 'الاختبارات', icon: Award },
+        { id: 'question_bank', label: 'بنك الأسئلة', icon: BookOpen },
         { id: 'schedule', label: 'الجدول الدراسي', icon: Clock },
         { id: 'tahsili', label: 'التحصيلي', icon: Film },
         { id: 'qudurat', label: 'القدرات', icon: Film },
@@ -202,11 +241,46 @@ export default function Dashboard() {
         { id: 'profile', label: 'الملف الشخصي', icon: UserIcon },
       ];
     } else {
+      if (userData?.isSpecialRegistration) {
+        const isSubscribedToQudurat = publishedQuduratReviews.some(review => 
+          review.enrolledStudentIds?.includes(userData?.id)
+        );
+        const isSubscribedToTahsili = publishedTahsiliReviews.some(review => 
+          review.enrolledStudentIds?.includes(userData?.id)
+        );
+
+        const items = [
+          { id: 'home', label: 'الرئيسية', icon: Target },
+        ];
+
+        const hasAnySubscription = isSubscribedToQudurat || isSubscribedToTahsili;
+
+        if (hasAnySubscription) {
+          if (isSubscribedToTahsili) {
+            items.push({ id: 'tahsili', label: 'التحصيلي', icon: Film });
+          }
+          if (isSubscribedToQudurat) {
+            items.push({ id: 'qudurat', label: 'القدرات', icon: Film });
+          }
+        } else {
+          const regType = userData.registrationType || 'both';
+          if (regType === 'tahsili' || regType === 'both') {
+            items.push({ id: 'tahsili', label: 'التحصيلي', icon: Film });
+          }
+          if (regType === 'qudurat' || regType === 'both') {
+            items.push({ id: 'qudurat', label: 'القدرات', icon: Film });
+          }
+        }
+        items.push({ id: 'wallet', label: 'المحفظة', icon: Ticket });
+        items.push({ id: 'profile', label: 'الملف الشخصي', icon: UserIcon });
+        return items;
+      }
       const base = [
         { id: 'home', label: 'الرئيسية', icon: Target },
         { id: 'subjects', label: 'موادي', icon: BookOpen },
         { id: 'teachers_list', label: 'المعلمون', icon: Users },
-        { id: 'student_store', label: 'المتجر', icon: Edit3 },
+        { id: 'student_store', label: 'المتجر', icon: ShoppingBag },
+        { id: 'purchases', label: 'مشترياتي', icon: FileText },
       ];
       return [
         ...base,
@@ -233,6 +307,64 @@ export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const userDataLoadedRef = useRef(false);
+
+  const prevStatusRef = useRef<string | undefined>(undefined);
+  const prevApprovedRef = useRef<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (userData) {
+      // 1. Special Registration Status Transitions
+      if (userData.isSpecialRegistration) {
+        if (prevStatusRef.current === 'pending' && userData.status === 'approved') {
+          toast.success('تهانينا يا بطل! 🎉 تم قبول طلب تسجيلك في المنصة بنجاح. يمكنك الآن البدء والدراسة في دوراتك المخصصة!', {
+            duration: 3000,
+            position: 'top-center',
+            style: {
+              borderRadius: '16px',
+              background: '#1A1A24',
+              color: '#fff',
+              border: '2px solid #10B981',
+              padding: '16px',
+              fontWeight: 'bold',
+            },
+          });
+        } else if (prevStatusRef.current === 'pending' && userData.status === 'rejected') {
+          toast.error('عذراً يا بطل، تم رفض طلب انضمامك للمسارات الخاصة. يرجى مراجعة الإدارة.', {
+            duration: 3000,
+            position: 'top-center',
+            style: {
+              borderRadius: '16px',
+              background: '#1A1A24',
+              color: '#fff',
+              border: '2px solid #EF4444',
+              padding: '16px',
+              fontWeight: 'bold',
+            },
+          });
+        }
+        prevStatusRef.current = userData.status;
+      } else {
+        prevStatusRef.current = userData.status;
+      }
+
+      // 2. Account general approval Transitions
+      if (prevApprovedRef.current === false && userData.isApproved === true) {
+        toast.success(`أهلاً بك! 🎉 تم تفعيل حسابك كـ ${userData.role === 'teacher' ? 'معلم' : userData.role === 'parent' ? 'ولي أمر' : 'طالب'} بنجاح في المنصة.`, {
+          duration: 3000,
+          position: 'top-center',
+          style: {
+            borderRadius: '16px',
+            background: '#1A1A24',
+            color: '#fff',
+            border: '2px solid #10B981',
+            padding: '16px',
+            fontWeight: 'bold',
+          },
+        });
+      }
+      prevApprovedRef.current = userData.isApproved;
+    }
+  }, [userData?.status, userData?.isApproved, userData?.isSpecialRegistration, userData?.role]);
 
   // Quizzes & Exams State
   const [quizzesList, setQuizzesList] = useState<any[]>([]);
@@ -1611,7 +1743,7 @@ export default function Dashboard() {
             } else if (data.type === "league_exam_alert") {
                toast.error(`${data.title}\n${data.message}`, {
                  icon: '⏰',
-                 duration: 10000,
+                 duration: 3000,
                  style: {
                    borderRadius: '16px',
                    background: '#1A1A24',
@@ -1622,7 +1754,7 @@ export default function Dashboard() {
             } else if (data.type === "new_teacher_alert") {
                toast.success(`${data.title}\n${data.message}`, {
                  icon: '👨‍🏫',
-                 duration: 8000,
+                 duration: 3000,
                  style: {
                    borderRadius: '16px',
                    background: '#1A1A24',
@@ -1633,7 +1765,7 @@ export default function Dashboard() {
             } else if (data.type === "new_course_alert") {
                toast.success(`${data.title}\n${data.message}`, {
                  icon: '📚',
-                 duration: 8000,
+                 duration: 3000,
                  style: {
                    borderRadius: '16px',
                    background: '#1A1A24',
@@ -1709,7 +1841,6 @@ export default function Dashboard() {
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0D0D12] text-gray-900 dark:text-white flex items-center justify-center p-6 selection:bg-primary/30 font-sans">
-        <Toaster position="top-center" reverseOrder={false} />
         <div className="absolute top-6 left-6">
           <ThemeToggle />
         </div>
@@ -1763,7 +1894,7 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-[#0D0D12] text-gray-900 dark:text-white flex flex-col md:flex-row font-sans selection:bg-primary/30 overflow-hidden">
+    <div className="h-screen print:h-auto print:block bg-gray-50 dark:bg-[#0D0D12] text-gray-900 dark:text-white flex flex-col md:flex-row font-sans selection:bg-primary/30 overflow-hidden print:overflow-visible">
       
             {/* Mobile Drawer Overlay */}
       <AnimatePresence>
@@ -1835,7 +1966,7 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
       {/* Sidebar */}
-      <aside className={`bg-white dark:bg-[#1A1A24] border-l border-gray-200 dark:border-[#2D2D3D] flex flex-col shrink-0 shadow-sm z-30 hidden md:flex h-full overflow-hidden transition-all duration-300 relative ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
+      <aside className={`bg-white dark:bg-[#1A1A24] border-l border-gray-200 dark:border-[#2D2D3D] flex flex-col shrink-0 shadow-sm z-30 hidden md:flex h-full print:hidden overflow-hidden transition-all duration-300 relative ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
         <div className={`h-20 border-b border-gray-200 dark:border-[#2D2D3D] flex items-center shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : 'justify-center gap-2.5'}`}>
             {settings.logoUrl ? (
               <img src={settings.logoUrl} alt="Logo" className={`w-8 h-8 object-contain rounded-xl shadow-md transition-all ${sidebarCollapsed ? 'scale-110' : ''}`} />
@@ -1892,10 +2023,9 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-y-auto relative">
-        <Toaster position="top-center" reverseOrder={false} />
+      <main className="flex-1 flex flex-col h-full overflow-y-auto relative print:overflow-visible print:h-auto print:block">
         {/* Top Header */}
-        <header className="bg-white dark:bg-[#1A1A24] border-b border-gray-200 dark:border-[#2D2D3D] px-3 md:px-6 h-16 md:h-20 flex items-center justify-between sticky top-0 z-20 shadow-sm shrink-0">
+        <header className="bg-white dark:bg-[#1A1A24] border-b border-gray-200 dark:border-[#2D2D3D] px-3 md:px-6 h-16 md:h-20 flex items-center justify-between sticky top-0 z-20 shadow-sm shrink-0 print:hidden">
            <div className="flex items-center gap-2 md:gap-4 shrink-0">
               <button 
                 onClick={() => setIsMobileDrawerOpen(true)}
@@ -1937,7 +2067,7 @@ export default function Dashboard() {
                   }}
                   role="button"
                   tabIndex={0}
-                  aria-label={`محفظتي التعليمية، الرصيد الحالي هو ${userData?.balance ?? 0} جنيه مصري. اضغط أو اضغط مسافة للذهاب للمحفظة`}
+                  aria-label={`محفظتي التعليمية، الرصيد الحالي هو ${userData?.balance ?? 0} ج.م. اضغط أو اضغط مسافة للذهاب للمحفظة`}
                   className="flex items-center gap-1.5 md:gap-2 bg-gradient-to-r from-[#00B4D8]/10 to-[#0077B6]/10 dark:from-[#D4AF37]/10 dark:to-[#B8860B]/10 hover:from-[#00B4D8]/20 hover:to-[#0077B6]/20 dark:hover:from-[#D4AF37]/20 dark:hover:to-[#B8860B]/20 border border-[#00B4D8]/20 dark:border-[#D4AF37]/20 px-2 md:px-3.5 py-1 md:py-1.5 rounded-xl md:rounded-2xl cursor-pointer transition-all duration-200 active:scale-95 shadow-sm group ml-2 focus:outline-none focus:ring-2 focus:ring-[#00B4D8] dark:focus:ring-[#D4AF37]"
                   title="محفظتي التعليمية - اضغط للذهاب للمحفظة"
                 >
@@ -2252,8 +2382,140 @@ export default function Dashboard() {
 
                 {userData?.role === 'student' && (
                   <>
-                    {/* Continue Learning */}
-                    <section>
+                    {userData?.isSpecialRegistration ? (
+                      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        {/* Special welcome for Tahsili/Qudurat */}
+                        <section className="bg-gradient-to-l from-[#00B4D8] to-[#0077B6] dark:from-[#D4AF37] dark:to-[#AA7C11] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-[#00B4D8]/10 dark:shadow-[#D4AF37]/10">
+                           <div className="relative z-10">
+                              <h1 className="text-3xl font-black mb-2">أهلاً بك يا بطل! 🚀</h1>
+                              <p className="text-white/90 font-bold max-w-xl leading-relaxed">
+                                نرحب بك في برنامج {
+                                  userData.registrationType === 'qudurat' 
+                                    ? 'القدرات' 
+                                    : userData.registrationType === 'tahsili' 
+                                      ? 'التحصيلي' 
+                                      : 'القدرات والتحصيلي'
+                                } المتميز. استعد لرحلة تفوق استثنائية!
+                              </p>
+                           </div>
+                           <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-x-8 -translate-y-8"></div>
+                           <div className="absolute bottom-0 right-0 w-48 h-48 bg-black/5 rounded-full blur-2xl translate-x-12 translate-y-12"></div>
+                        </section>
+
+                        {/* Status Message */}
+                        {userData.status === 'pending' && (
+                           <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200/50 dark:border-amber-500/20 rounded-3xl p-6 flex items-start gap-4 shadow-sm">
+                              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                                <Info className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                              </div>
+                              <div>
+                                 <h4 className="font-black text-gray-900 dark:text-white mb-1">طلبك قيد المراجعة</h4>
+                                 <p className="text-sm font-bold text-gray-600 dark:text-gray-400">
+                                   سيقوم المسئول بمراجعة بياناتك وتفعيل حسابك قريباً. بمجرد التفعيل ستتمكن من البدء في {
+                                     userData.registrationType === 'qudurat' 
+                                       ? 'دورة القدرات' 
+                                       : userData.registrationType === 'tahsili' 
+                                         ? 'دورة التحصيلي' 
+                                         : 'دورات القدرات والتحصيلي'
+                                   }.
+                                 </p>
+                              </div>
+                           </div>
+                        )}
+
+                        {userData.status === 'rejected' && (
+                           <div className="bg-red-50 dark:bg-red-500/10 border border-red-200/50 dark:border-red-500/20 rounded-3xl p-6 flex items-start gap-4 shadow-sm">
+                              <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center shrink-0">
+                                <X className="w-6 h-6 text-red-600 dark:text-red-400" />
+                              </div>
+                              <div>
+                                 <h4 className="font-black text-gray-900 dark:text-white mb-1">تم رفض طلب التسجيل</h4>
+                                 <p className="text-sm font-bold text-gray-600 dark:text-gray-400">
+                                   عذراً يا بطل، تم رفض طلب تسجيل حسابك الخاص من قبل الإدارة. يرجى التواصل مع إدارة المنصة للاستفسار أو الدعم.
+                                 </p>
+                              </div>
+                           </div>
+                        )}
+
+                        {/* Quick Actions */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           {(userData.registrationType === 'qudurat' || userData.registrationType === 'both') && (
+                             <button 
+                               onClick={() => {
+                                 if (userData.status === 'pending') {
+                                   toast.error('حسابك قيد المراجعة، يرجى الانتظار حتى يتم تفعيله من قبل الإدارة.');
+                                   return;
+                                 }
+                                 if (userData.status === 'rejected') {
+                                   toast.error('تم رفض طلب تسجيلك، يرجى التواصل مع الإدارة.');
+                                   return;
+                                 }
+                                 setActiveTab('qudurat');
+                               }}
+                               className="bg-white dark:bg-[#1A1A24] p-8 rounded-[2.5rem] border border-gray-100 dark:border-[#2D2D3D] shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-5 text-center group cursor-pointer"
+                             >
+                                <div className="w-20 h-20 rounded-3xl bg-[#00B4D8]/10 text-[#00B4D8] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] flex items-center justify-center group-hover:scale-110 transition-transform">
+                                   <Film className="w-10 h-10" />
+                                </div>
+                                <div>
+                                   <h4 className="font-black text-gray-900 dark:text-white text-xl">بدء القدرات</h4>
+                                   <p className="text-sm font-bold text-gray-400 mt-1">انطلق الآن وشاهد المحاضرات والتدريبات</p>
+                                </div>
+                             </button>
+                           )}
+                           {(userData.registrationType === 'tahsili' || userData.registrationType === 'both') && (
+                             <button 
+                               onClick={() => {
+                                 if (userData.status === 'pending') {
+                                   toast.error('حسابك قيد المراجعة، يرجى الانتظار حتى يتم تفعيله من قبل الإدارة.');
+                                   return;
+                                 }
+                                 if (userData.status === 'rejected') {
+                                   toast.error('تم رفض طلب تسجيلك، يرجى التواصل مع الإدارة.');
+                                   return;
+                                 }
+                                 setActiveTab('tahsili');
+                               }}
+                               className="bg-white dark:bg-[#1A1A24] p-8 rounded-[2.5rem] border border-gray-100 dark:border-[#2D2D3D] shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-5 text-center group cursor-pointer"
+                             >
+                                <div className="w-20 h-20 rounded-3xl bg-[#00B4D8]/10 text-[#00B4D8] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] flex items-center justify-center group-hover:scale-110 transition-transform">
+                                   <Film className="w-10 h-10" />
+                                </div>
+                                <div>
+                                   <h4 className="font-black text-gray-900 dark:text-white text-xl">بدء التحصيلي</h4>
+                                   <p className="text-sm font-bold text-gray-400 mt-1">انطلق الآن وشاهد المحاضرات والتدريبات</p>
+                                </div>
+                             </button>
+                           )}
+                           <button 
+                             onClick={() => setActiveTab('wallet')}
+                             className="bg-white dark:bg-[#1A1A24] p-8 rounded-[2.5rem] border border-gray-100 dark:border-[#2D2D3D] shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-5 text-center group cursor-pointer md:col-span-2"
+                           >
+                              <div className="w-20 h-20 rounded-3xl bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform animate-pulse">
+                                 <Wallet className="w-10 h-10" />
+                              </div>
+                              <div>
+                                 <h4 className="font-black text-gray-900 dark:text-white text-xl">شحن الرصيد والمحفظة</h4>
+                                 <p className="text-sm font-bold text-gray-400 mt-1">إضافة رصيد لمحفظتك للاشتراك في المراجعات والدروس</p>
+                              </div>
+                           </button>
+                        </div>
+
+                        {/* Recent Progress (Empty state for now) */}
+                        <section className="bg-white dark:bg-[#1A1A24] rounded-3xl p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-sm">
+                           <div className="flex items-center gap-3 mb-6">
+                              <Target className="w-6 h-6 text-[#00B4D8] dark:text-[#D4AF37]" />
+                              <h3 className="text-xl font-black text-gray-900 dark:text-white">آخر المحاضرات التي شاهدتها</h3>
+                           </div>
+                           <div className="text-center py-10 text-gray-500 dark:text-gray-400 font-bold">
+                              لا توجد مشاهدات سابقة بعد. ابدأ رحلتك الآن! 🎥
+                           </div>
+                        </section>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Continue Learning */}
+                        <section>
                        <h2 className="text-xl font-black mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
                           <Target className="w-5 h-5 text-[#00B4D8] dark:text-[#D4AF37]" /> استكمل التعلم
                        </h2>
@@ -2481,15 +2743,15 @@ export default function Dashboard() {
                                         {discount ? (
                                           <>
                                             <span className="text-sm font-black text-purple-600 dark:text-purple-400">
-                                              {review.discountPrice} ر.س
+                                              {review.discountPrice} ج.م
                                             </span>
                                             <span className="text-[10px] text-gray-400 line-through">
-                                              {review.price} ر.س
+                                              {review.price} ج.م
                                             </span>
                                           </>
                                         ) : (
                                           <span className="text-sm font-black text-purple-600 dark:text-purple-400">
-                                            {review.price === 0 ? 'مجاني' : `${review.price} ر.س`}
+                                            {review.price === 0 ? 'مجاني' : `${review.price} ج.م`}
                                           </span>
                                         )}
                                       </div>
@@ -2579,8 +2841,10 @@ export default function Dashboard() {
                     </section>
                   </>
                 )}
-              </motion.div>
+              </>
             )}
+          </motion.div>
+        )}
 
             {activeTab === 'activate' && (
               <motion.div
@@ -2852,7 +3116,7 @@ export default function Dashboard() {
               </motion.div>
             )}
 
-            {activeTab === 'student_store' && userData?.role === 'student' && (
+                        {activeTab === 'student_store' && userData?.role === 'student' && (
               <motion.div
                 key="student_store"
                 initial={{ opacity: 0, y: 10 }}
@@ -2860,6 +3124,17 @@ export default function Dashboard() {
                 exit={{ opacity: 0, y: -10 }}
               >
                 <StudentStore userData={userData} setUserData={setUserData} />
+              </motion.div>
+            )}
+
+            {activeTab === 'purchases' && userData?.role === 'student' && (
+              <motion.div
+                key="purchases"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <StudentPurchases userData={userData} />
               </motion.div>
             )}
 
@@ -2894,6 +3169,18 @@ export default function Dashboard() {
                   </div>
                   <FinancesManager userData={userData} />
                 </div>
+              </motion.div>
+            )}
+
+             {activeTab === 'question_bank' && userData?.role === 'teacher' && (
+              <motion.div
+                key="question_bank"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="max-w-5xl mx-auto space-y-8"
+              >
+                <TeacherQuestionBank userData={userData} />
               </motion.div>
             )}
 

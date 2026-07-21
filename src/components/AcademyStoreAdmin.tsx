@@ -440,48 +440,59 @@ export default function AcademyStoreAdmin({ userData }: { userData: any }) {
 
         {activeTab === 'analytics' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white dark:bg-[#12121A] p-5 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/20 rounded-xl flex items-center justify-center text-purple-600">
-                    <Package className="w-6 h-6" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="bg-white dark:bg-[#12121A] p-3 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 shrink-0 bg-purple-50 dark:bg-purple-900/20 rounded-xl flex items-center justify-center text-purple-600">
+                    <Package className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">إجمالي الأصناف</p>
-                    <p className="text-2xl font-black dark:text-white">{items.length}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">إجمالي الأصناف</p>
+                    <p className="text-base font-black dark:text-white">{items.length}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-white dark:bg-[#12121A] p-5 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center text-blue-600">
-                    <ShoppingCart className="w-6 h-6" />
+              <div className="bg-white dark:bg-[#12121A] p-3 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 shrink-0 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center text-blue-600">
+                    <ShoppingCart className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">إجمالي المبيعات (نسخة)</p>
-                    <p className="text-2xl font-black dark:text-white">{items.reduce((acc, item) => acc + (item.salesCount || 0), 0)}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">المبيعات (نسخة)</p>
+                    <p className="text-base font-black dark:text-white">{items.reduce((acc, item) => acc + (item.salesCount || 0), 0)}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-white dark:bg-[#12121A] p-5 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center text-emerald-600">
-                    <Wallet className="w-6 h-6" />
+              <div className="bg-white dark:bg-[#12121A] p-3 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 shrink-0 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center text-emerald-600">
+                    <Wallet className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">إجمالي الإيرادات</p>
-                    <p className="text-2xl font-black dark:text-white font-mono">{items.reduce((acc, item) => acc + (item.sellingPrice * (item.salesCount || 0)), 0)} <span className="text-sm">ج.م</span></p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">إجمالي الإيرادات</p>
+                    <p className="text-base font-black dark:text-white font-mono">{items.reduce((acc, item) => acc + (item.sellingPrice * (item.salesCount || 0)), 0)} <span className="text-[10px]">ج.م</span></p>
                   </div>
                 </div>
               </div>
-              <div className="bg-white dark:bg-[#12121A] p-5 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-rose-50 dark:bg-rose-900/20 rounded-xl flex items-center justify-center text-rose-600">
-                    <TrendingUp className="w-6 h-6" />
+              <div className="bg-white dark:bg-[#12121A] p-3 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 shrink-0 bg-amber-50 dark:bg-amber-900/20 rounded-xl flex items-center justify-center text-amber-600">
+                    <Wallet className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">صافي الأرباح</p>
-                    <p className="text-2xl font-black dark:text-white font-mono">{items.reduce((acc, item) => acc + ((item.sellingPrice - item.purchasePrice) * (item.salesCount || 0)), 0)} <span className="text-sm">ج.م</span></p>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">إجمالي التكاليف</p>
+                    <p className="text-base font-black dark:text-white font-mono">{items.reduce((acc, item) => acc + (item.purchasePrice * (item.salesCount || 0)), 0)} <span className="text-[10px]">ج.م</span></p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-[#12121A] p-3 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 shrink-0 bg-rose-50 dark:bg-rose-900/20 rounded-xl flex items-center justify-center text-rose-600">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">صافي الأرباح</p>
+                    <p className="text-base font-black dark:text-white font-mono">{items.reduce((acc, item) => acc + ((item.sellingPrice - item.purchasePrice) * (item.salesCount || 0)), 0)} <span className="text-[10px]">ج.م</span></p>
                   </div>
                 </div>
               </div>

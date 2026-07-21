@@ -19,7 +19,10 @@
         "nationalId": { "type": "string", "pattern": "^[23][0-9]{13}$" },
         "dateOfBirth": { "type": "string", "maxLength": 20 },
         "teachingGrades": { "type": "array", "maxLength": 3 },
-        "balance": { "type": "number" }
+        "balance": { "type": "number" },
+        "registrationType": { "type": "string", "enum": ["regular", "qudurat", "tahsili"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "isSpecialRegistration": { "type": "boolean" }
       },
       "required": ["email", "name", "phone", "governorate", "role"]
     },
@@ -115,7 +118,7 @@
         "userId": { "type": "string" },
         "userName": { "type": "string" },
         "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["course_purchase", "recharge", "tahsili_purchase"] },
+        "type": { "type": "string", "enum": ["course_purchase", "recharge", "tahsili_purchase", "qudurat_purchase"] },
         "description": { "type": "string" },
         "createdAt": { "type": "string" }
       },

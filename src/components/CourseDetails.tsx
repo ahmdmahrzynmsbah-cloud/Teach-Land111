@@ -524,7 +524,11 @@ export default function CourseDetails() {
     try {
       if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
         const videoId = url.includes('youtu.be/') ? url.split('youtu.be/')[1].split('?')[0] : new URL(url).searchParams.get('v');
-        return `https://www.youtube.com/embed/${videoId}`;
+        return `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&iv_load_policy=3`;
+      }
+      if (url.includes('youtube.com/embed/')) {
+        const separator = url.includes('?') ? '&' : '?';
+        return `${url}${separator}modestbranding=1&rel=0&iv_load_policy=3`;
       }
       if (url.includes('tiktok.com')) {
         const match = url.match(/\/(?:video|photo|v)\/(\d+)/);
@@ -1218,7 +1222,6 @@ export default function CourseDetails() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0D0D12] text-gray-900 dark:text-white font-sans selection:bg-[#00B4D8]/30 dark:selection:bg-[#D4AF37]/30">
-      <Toaster position="top-center" reverseOrder={false} />
       {/* Header */}
       <header className="bg-white dark:bg-[#1A1A24] border-b border-gray-200 dark:border-[#2D2D3D] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">

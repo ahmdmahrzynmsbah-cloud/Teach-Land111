@@ -310,6 +310,20 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
 
     return (
       <div className="space-y-8 animate-in fade-in duration-300">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-[#1A1A24] p-5 rounded-2xl border border-gray-200 dark:border-[#2D2D3D] print:hidden">
+          <div>
+            <h3 className="text-lg font-black text-gray-900 dark:text-white">نظرة عامة على المنصة</h3>
+            <p className="text-xs text-gray-500 font-bold mt-1">احصائيات سريعة للحالة الحالية</p>
+          </div>
+          <button
+            onClick={() => setPrintModalOpen(true)}
+            className="flex items-center gap-2 bg-[#00B4D8] hover:bg-[#0096B4] dark:bg-[#D4AF37] dark:hover:bg-[#B8860B] text-white dark:text-[#0D0D12] font-black text-xs px-5 py-3 rounded-xl transition-all shadow-md"
+          >
+            <Printer className="w-4 h-4" />
+            استخراج تقرير المنصة التفصيلي
+          </button>
+        </div>
+
         {/* Status Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10 p-6 rounded-2xl border border-blue-200/50 dark:border-blue-900/40 flex items-center gap-4">
@@ -491,6 +505,197 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
             </table>
           </div>
         </div>
+        
+        {/* Admin Print Modal */}
+        <AnimatePresence>
+          {printModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:p-0 print:static print:h-auto print:block">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden"
+                onClick={() => setPrintModalOpen(false)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative bg-white dark:bg-[#1A1A24] rounded-3xl w-full max-w-4xl p-6 md:p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-2xl z-10 max-h-[90vh] overflow-y-auto flex flex-col md:flex-row gap-6 print:w-full print:max-w-none print:max-h-none print:h-auto print:overflow-visible print:bg-white print:text-black print:p-0 print:border-none print:shadow-none print:block"
+              >
+                {/* Left Side (Print Customizer) */}
+                <div className="w-full md:w-80 space-y-4 md:border-l md:border-slate-150 md:pl-6 print:hidden">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-[#2D2D3D]">
+                    <h3 className="font-black text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-4 h-4 text-[#00B4D8]" />
+                      خيارات تخصيص التقرير
+                    </h3>
+                    <button 
+                      onClick={() => setPrintModalOpen(false)}
+                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[#0D0D12] text-slate-400"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-slate-500 dark:text-slate-400 block mb-1">عنوان التقرير المخصص</label>
+                    <input 
+                      type="text" 
+                      value={customReportTitle}
+                      onChange={(e) => setCustomReportTitle(e.target.value)}
+                      placeholder="تقرير حالة المنصة الشامل"
+                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-purple-500 dark:text-white" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-slate-500 dark:text-slate-400 block mb-1">ملاحظات أو قرارات (تظهر بالتقرير)</label>
+                    <textarea 
+                      value={customReportNotes}
+                      onChange={(e) => setCustomReportNotes(e.target.value)}
+                      rows={3}
+                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-purple-500 dark:text-white resize-none" 
+                    />
+                  </div>
+
+                  <button 
+                    onClick={handlePrint}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md shadow-purple-600/20 flex items-center justify-center gap-2 mt-4"
+                  >
+                    <Printer className="w-4 h-4" />
+                    بدء الطباعة الفعلية وتصدير PDF
+                  </button>
+                </div>
+
+                {/* Right Side (Visual Report Preview) */}
+                <div className="flex-1 bg-white text-slate-900 border border-slate-200 rounded-2xl p-6 md:p-8 flex flex-col justify-between shadow-sm print:border-none print:shadow-none print:p-0 printable-area">
+                  
+                  {/* Header */}
+                  <div className="space-y-6 pb-6 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-right">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 justify-center sm:justify-start mb-2">
+                          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <Shield className="w-5 h-5 text-white" />
+                          </div>
+                          <span className="text-lg font-black text-slate-800 tracking-tight">Teachland</span>
+                        </div>
+                        <h3 className="text-base font-black text-slate-950">
+                          {customReportTitle || 'تقرير حالة المنصة الشامل'}
+                        </h3>
+                        <p className="text-[10px] text-slate-500 font-bold mt-1">
+                          تاريخ الإصدار: شامل لجميع البيانات الحالية
+                        </p>
+                      </div>
+
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-[10px] font-bold text-slate-500 space-y-1 text-center sm:text-left print:bg-white print:border-slate-300">
+                        <div>المعرف الإداري: <span className="font-mono text-slate-800">#{userData?.id?.slice(0, 8)}</span></div>
+                        <div>تاريخ المعاينة: <span className="font-mono text-slate-800">{new Date().toLocaleDateString('en-GB')}</span></div>
+                      </div>
+                    </div>
+
+                    {/* Admin Stats Summary */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-150 text-xs font-bold text-slate-700 print:bg-white print:border-slate-300">
+                      <div className="space-y-1">
+                        <span className="text-slate-400 block text-[10px]">الطلاب المسجلين:</span>
+                        <span className="text-slate-950 font-black text-sm">{adminStats.totalStudents}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-slate-400 block text-[10px]">المعلمين المعتمدين:</span>
+                        <span className="text-slate-950 font-black text-sm">{adminStats.totalTeachers}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-slate-400 block text-[10px]">الكورسات النشطة:</span>
+                        <span className="text-slate-950 font-black text-sm">{adminStats.totalCourses}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-slate-400 block text-[10px]">المدفوعات/العمليات:</span>
+                        <span className="text-slate-950 font-black text-sm">{adminStats.totalTransactions}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="py-6 space-y-6">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 print:bg-white print:border-slate-300">
+                      <h4 className="text-xs font-black text-slate-400 mb-3 border-b border-slate-200 pb-1 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        أحدث الأعضاء انضماماً للمنصة
+                      </h4>
+                      
+                      {adminStats.recentUsers.length > 0 ? (
+                        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                          <table className="w-full text-right text-[10px]">
+                            <thead className="bg-slate-100 font-extrabold text-slate-600 border-b border-slate-200">
+                              <tr>
+                                <th className="p-2.5">الاسم</th>
+                                <th className="p-2.5">الدور</th>
+                                <th className="p-2.5">البريد الإلكتروني</th>
+                                <th className="p-2.5 text-center">تاريخ الانضمام</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                              {adminStats.recentUsers.map((user) => (
+                                <tr key={user.id} className="hover:bg-slate-50/50">
+                                  <td className="p-2.5">{user.name || 'مستخدم بلا اسم'}</td>
+                                  <td className="p-2.5 text-slate-400 font-medium">
+                                    {user.role === 'teacher' ? 'معلم' : user.role === 'parent' ? 'ولي أمر' : user.role === 'admin' ? 'مدير' : 'طالب'}
+                                  </td>
+                                  <td className="p-2.5 font-mono text-slate-400">{user.email || '-'}</td>
+                                  <td className="p-2.5 text-center font-mono text-slate-400">{formatArabicDate(user.createdAt)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-[10px] font-bold text-slate-400">
+                          لا توجد بيانات متاحة للعرض
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2 text-xs font-bold text-slate-700 print:bg-white print:border-slate-300">
+                        <h4 className="text-[10px] font-black text-slate-400 border-b border-slate-200 pb-1 flex items-center gap-1.5">
+                          <Book className="w-3.5 h-3.5 text-slate-400" />
+                          توزيع المواد والكورسات
+                        </h4>
+                        <div className="space-y-1 text-[10px] mt-2">
+                          {adminStats.subjectStats.map((stat, i) => (
+                            <div key={i} className="flex justify-between items-center p-1.5 bg-white rounded border border-slate-100">
+                              <span className="text-slate-600">{stat.name}</span>
+                              <span className="text-slate-800 font-black">{stat.value} كورسات</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {customReportNotes && (
+                      <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100 text-xs font-bold text-slate-700 print:bg-white print:border-slate-300">
+                        <h4 className="text-[10px] font-black text-purple-600 mb-1 flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5" />
+                          ملاحظات إضافية:
+                        </h4>
+                        <p className="text-slate-600 text-[10px] leading-relaxed italic">{customReportNotes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="pt-6 border-t border-slate-200 text-center space-y-4">
+                    <p className="text-[8px] text-slate-400 font-bold leading-loose">
+                      صدر هذا التقرير إلكترونياً عن طريق الإدارة المركزية لمنصة Teachland التعليمية المعتمدة.<br/>
+                      جميع البيانات الواردة في هذا التقرير سرية ومخصصة للإدارة فقط.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -817,13 +1022,13 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
       {/* PREVIEW AND PRINT STUDENT REPORT MODAL */}
       <AnimatePresence>
         {printModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto print:static print:h-auto print:block print:p-0">
             {/* Background overlay */}
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm" 
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm print:hidden" 
               onClick={() => setPrintModalOpen(false)} 
             />
 
@@ -832,7 +1037,7 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
               initial={{ scale: 0.95, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.95, opacity: 0 }} 
-              className="relative bg-white dark:bg-[#1A1A24] rounded-3xl w-full max-w-4xl p-6 md:p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-2xl z-10 max-h-[90vh] overflow-y-auto flex flex-col md:flex-row gap-6 print:absolute print:inset-0 print:bg-white print:text-black print:p-0 print:border-none print:shadow-none"
+              className="relative bg-white dark:bg-[#1A1A24] rounded-3xl w-full max-w-4xl p-6 md:p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-2xl z-10 max-h-[90vh] overflow-y-auto flex flex-col md:flex-row gap-6 print:w-full print:max-w-none print:max-h-none print:h-auto print:overflow-visible print:bg-white print:text-black print:p-0 print:border-none print:shadow-none print:block"
             >
               {/* Left Side (Print Customizer) */}
               <div className="w-full md:w-80 space-y-4 md:border-l md:border-slate-150 md:pl-6 print:hidden">

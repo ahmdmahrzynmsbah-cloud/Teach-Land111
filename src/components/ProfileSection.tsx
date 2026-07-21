@@ -7,7 +7,7 @@ import {
   BarChart2, Trophy, TrendingUp, CheckCircle, Play, Users, Percent, Star, ChevronLeft, Zap, LogOut
 } from 'lucide-react';
 import { updateDoc, doc, deleteDoc, getDocs, collection, query, where } from 'firebase/firestore';
-import { updatePassword, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { updatePassword, deleteUser, reauthenticateWithCredential, EmailAuthProvider, updateEmail } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -29,7 +29,7 @@ interface ProfileSectionProps {
 
 export default function ProfileSection({ userData, onUpdateUserData }: ProfileSectionProps) {
   const navigate = useNavigate();
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'courses' | 'achievements' | 'basic' | 'academic' | 'idCard' | 'security' | 'danger'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'courses' | 'achievements' | 'basic' | 'academic' | 'idCard' | 'security'>('stats');
   const [loading, setLoading] = useState(false);
   const [avatarBg, setAvatarBg] = useState(userData?.avatarBg || 'from-[#00B4D8] to-[#0077B6]');
   const [isFlipped, setIsFlipped] = useState(false);
@@ -218,11 +218,7 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  // Delete Account Confirmation State
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
+  const [newEmail, setNewEmail] = useState('');
 
   // Save basic/role-specific information
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -327,23 +323,11 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
     }
   };
 
-  // Toggle teaching grades for teachers
-  const handleToggleGrade = (gradeName: string) => {
-    if (teachingGrades.includes(gradeName)) {
-      setTeachingGrades(teachingGrades.filter(g => g !== gradeName));
-    } else {
-      setTeachingGrades([...teachingGrades, gradeName]);
-    }
-  };
-
-  // Permanently delete account
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmationText !== 'احذف حسابي') {
-      toast.error('يرجى كتابة الكلمة التأكيدية بشكل صحيح');
-      return;
-    }
-    if (!deletePassword) {
-      toast.error('الرجاء إدخال كلمة المرور لتأكيد الهوية');
+  // Change email
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail || !currentPassword) {
+      toast.error('الرجاء إدخال البريد الإلكتروني الجديد وكلمة المرور الحالية');
       return;
     }
 
@@ -354,34 +338,37 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
         throw new Error('لم يتم العثور على المستخدم الحالي');
       }
 
-      // Reauthenticate to prove identity before deletion
-      const credential = EmailAuthProvider.credential(user.email, deletePassword);
+      // Reauthenticate user first
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
       await reauthenticateWithCredential(user, credential);
-
-      const userId = user.uid;
-
-      // 1. Delete user doc from Firestore
-      await deleteDoc(doc(db, 'users', userId));
-
-      // 2. Delete Auth User from Firebase
-      await deleteUser(user);
-
-      toast.success('تم حذف الحساب والبيانات نهائياً بنجاح. نأسف لمغادرتك! 👋');
-      setShowDeleteModal(false);
-      navigate('/');
+      
+      // Update Email
+      await updateEmail(user, newEmail);
+      
+      // Update email in Firestore as well
+      await updateDoc(doc(db, 'users', userData.id), { email: newEmail });
+      
+      onUpdateUserData({ ...userData, email: newEmail });
+      toast.success('تم تحديث البريد الإلكتروني بنجاح! 📧');
+      setNewEmail('');
+      setCurrentPassword('');
     } catch (error: any) {
-      console.error('Error deleting account:', error);
-      if (error.code === 'auth/wrong-password') {
-        toast.error('كلمة المرور غير صحيحة. يرجى إعادة المحاولة.');
-      } else if (error.code === 'auth/requires-recent-login') {
-        toast.error('أمنياً، تتطلب هذه العملية تسجيل خروجك ثم تسجيل الدخول مرة أخرى للتحقق من هويتك.');
-      } else {
-        toast.error('حدث خطأ أثناء حذف الحساب: ' + (error.message || 'يرجى المحاولة لاحقاً'));
-      }
+      console.error('Error changing email:', error);
+      toast.error('فشل تحديث البريد: ' + (error.message || 'يرجى التأكد من البيانات'));
     } finally {
       setLoading(false);
     }
   };
+
+  // Toggle teaching grades for teachers
+  const handleToggleGrade = (gradeName: string) => {
+    if (teachingGrades.includes(gradeName)) {
+      setTeachingGrades(teachingGrades.filter(g => g !== gradeName));
+    } else {
+      setTeachingGrades([...teachingGrades, gradeName]);
+    }
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -507,15 +494,6 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
             }`}
           >
             <Lock className="w-4 h-4 shrink-0" /> الأمان والحماية
-          </button>
-
-          <button
-            onClick={() => setActiveSubTab('danger')}
-            className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 whitespace-nowrap ${
-              activeSubTab === 'danger' ? 'bg-red-50 dark:bg-red-950/20 font-black' : ''
-            }`}
-          >
-            <Trash2 className="w-4 h-4 shrink-0" /> منطقة الخطر
           </button>
 
           <button
@@ -1676,204 +1654,105 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
                 exit={{ opacity: 0, x: 10 }}
                 className="bg-white dark:bg-[#1A1A24] rounded-3xl p-6 sm:p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6"
               >
-                <div>
-                  <h3 className="text-lg font-black text-gray-900 dark:text-white mb-1">تعديل كلمة مرور الحساب</h3>
-                  <p className="text-gray-400 dark:text-gray-500 text-xs">قم بتحديث كلمة المرور بانتظام للحفاظ على خصوصيتك وأمان حسابك</p>
-                </div>
-
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5 text-[#00B4D8] dark:text-[#D4AF37]" /> كلمة المرور الحالية
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] focus:bg-white dark:focus:bg-[#1A1A24] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
-                      dir="ltr"
-                      placeholder="••••••••"
-                    />
+                <div className="space-y-4">
+                  <h3 className="text-lg font-black text-gray-900 dark:text-white">إعدادات الأمان</h3>
+                  
+                  {/* Email Update Form */}
+                  <div className="p-4 bg-gray-50 dark:bg-[#0D0D12] rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                    <h4 className="text-sm font-black text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[#00B4D8] dark:text-[#D4AF37]" /> تعديل البريد الإلكتروني
+                    </h4>
+                    <form onSubmit={handleChangeEmail} className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-500 dark:text-gray-400">البريد الإلكتروني الجديد</label>
+                        <input
+                          type="email"
+                          required
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          className="w-full bg-white dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
+                          dir="ltr"
+                          placeholder="new@example.com"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-gray-800 dark:bg-[#2D2D3D] hover:bg-gray-900 dark:hover:bg-[#3D3D4D] text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                      >
+                        {loading ? 'جاري التحديث...' : 'تحديث البريد'}
+                      </button>
+                    </form>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-[#00B4D8] dark:text-[#D4AF37]" /> كلمة المرور الجديدة
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] focus:bg-white dark:focus:bg-[#1A1A24] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
-                      dir="ltr"
-                      placeholder="••••••••"
-                    />
-                  </div>
+                  {/* Password Update Form */}
+                  <div className="p-4 bg-gray-50 dark:bg-[#0D0D12] rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                    <h4 className="text-sm font-black text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-[#00B4D8] dark:text-[#D4AF37]" /> تعديل كلمة المرور
+                    </h4>
+                    <form onSubmit={handleChangePassword} className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Key className="w-3.5 h-3.5 text-[#00B4D8] dark:text-[#D4AF37]" /> كلمة المرور الحالية
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="w-full bg-white dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
+                          dir="ltr"
+                          placeholder="••••••••"
+                        />
+                      </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      <ShieldAlert className="w-3.5 h-3.5 text-[#00B4D8] dark:text-[#D4AF37]" /> تأكيد كلمة المرور الجديدة
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] focus:bg-white dark:focus:bg-[#1A1A24] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
-                      dir="ltr"
-                      placeholder="••••••••"
-                    />
-                  </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-[#00B4D8] dark:text-[#D4AF37]" /> كلمة المرور الجديدة
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-white dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
+                          dir="ltr"
+                          placeholder="••••••••"
+                        />
+                      </div>
 
-                  <div className="pt-4">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-[#00B4D8] dark:bg-[#D4AF37] hover:bg-[#0077B6] dark:hover:bg-[#B8860B] disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-[#00B4D8]/10 dark:shadow-[#D4AF37]/10 flex items-center justify-center gap-2 transition-all"
-                    >
-                      {loading ? (
-                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      ) : (
-                        <>
-                          <Key className="w-4 h-4" /> تحديث كلمة المرور
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 text-[#00B4D8] dark:text-[#D4AF37]" /> تأكيد كلمة المرور الجديدة
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full bg-white dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] focus:border-[#00B4D8] dark:focus:border-[#D4AF37] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition-colors text-right"
+                          dir="ltr"
+                          placeholder="••••••••"
+                        />
+                      </div>
 
-            {/* Danger Zone Content */}
-            {activeSubTab === 'danger' && (
-              <motion.div
-                key="danger"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="bg-red-50/50 dark:bg-red-950/10 rounded-3xl p-6 sm:p-8 border border-red-200 dark:border-red-900/30 shadow-sm space-y-6"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-red-100 dark:bg-red-950/40 rounded-2xl flex items-center justify-center text-red-500 shrink-0">
-                    <AlertTriangle className="w-6 h-6" />
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-[#00B4D8] dark:bg-[#D4AF37] hover:bg-[#0077B6] dark:hover:bg-[#B8860B] disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
+                      >
+                        {loading ? 'جاري التحديث...' : 'تحديث كلمة المرور'}
+                      </button>
+                    </form>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-black text-red-600 dark:text-red-400 mb-1">حذف الحساب نهائياً</h3>
-                    <p className="text-gray-500 dark:text-gray-400 text-xs leading-relaxed">
-                      بمجرد حذف حسابك، لن تتمكن من التراجع عن هذه الخطوة. سيتم محو جميع كورساتك المشترك بها، مستواك التعليمي، درجاتك، مدفوعاتك، ورصيد محفظتك بالكامل ولن نتمكن من استرجاعها مطلقاً.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-white dark:bg-[#1A1A24] rounded-2xl p-4 border border-red-100 dark:border-red-950/40 text-xs text-red-500 dark:text-red-400 leading-relaxed font-bold">
-                  ⚠️ <b>تنبيه بالغ الأهمية:</b> إذا قمت بحذف الحساب وكان لديك اشتراكات نشطة أو مبالغ متبقية في محفظتك الإلكترونية، فستفقدها تماماً دون أي حق للمطالبة بها. يرجى مراجعة الدعم الفني أولاً إن كنت تواجه أي مشكلة.
-                </div>
-
-                <div className="pt-4 flex justify-end">
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-red-500/10 hover:shadow-red-500/20 w-full sm:w-auto"
-                  >
-                    بدء إجراءات حذف الحساب النهائي
-                  </button>
                 </div>
               </motion.div>
             )}
+
           </AnimatePresence>
         </div>
       </div>
 
-      {/* Account Deletion Confirmation Dialog Modal */}
-      <AnimatePresence>
-        {showDeleteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              onClick={() => setShowDeleteModal(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-[#1A1A24] rounded-2xl w-full max-w-md relative z-10 shadow-2xl p-5 sm:p-6 border border-red-100 dark:border-red-950/20 text-center space-y-4"
-            >
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-950/40 rounded-full flex items-center justify-center mx-auto text-red-500 dark:text-red-400">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              
-              <div className="space-y-1.5">
-                <h3 className="text-xl font-black text-gray-900 dark:text-white">تأكيد حذف الحساب 🤔</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-xs leading-relaxed">
-                  هذا الإجراء سيقوم بحذف حسابك بالكامل من قواعد بيانات "Teachland". لتأكيد رغبتك الجادة، يرجى كتابة العبارة التالية في المربع أدناه:
-                </p>
-                <div className="bg-red-50 dark:bg-red-950/20 px-3 py-1.5 rounded-lg inline-block border border-red-200/40 font-black text-red-600 dark:text-red-400 text-xs mt-1">
-                  احذف حسابي
-                </div>
-              </div>
-
-              <div className="space-y-3 text-right">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-black text-gray-500 dark:text-gray-400 block">اكتب كلمة التأكيد هنا</label>
-                  <input
-                    type="text"
-                    required
-                    value={deleteConfirmationText}
-                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] focus:border-red-500 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white outline-none text-center font-bold"
-                    placeholder="احذف حسابي"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-black text-gray-500 dark:text-gray-400 block">أدخل كلمة مرور الحساب للتحقق الأمني</label>
-                  <input
-                    type="password"
-                    required
-                    value={deletePassword}
-                    onChange={(e) => setDeletePassword(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] focus:border-red-500 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white outline-none text-center"
-                    placeholder="••••••••"
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setDeleteConfirmationText('');
-                    setDeletePassword('');
-                  }}
-                  className="px-4 py-2.5 rounded-xl font-bold text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#2D2D3D] hover:bg-gray-200 dark:hover:bg-[#3d3d52] transition-colors flex-1 order-2 sm:order-1"
-                >
-                  تراجع، لا أريد الحذف
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handleDeleteAccount}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex-1 shadow-lg shadow-red-500/15 flex items-center justify-center gap-1.5 order-1 sm:order-2"
-                >
-                  {loading ? (
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  ) : (
-                    <>
-                      <Trash2 className="w-3.5 h-3.5" /> نعم، احذف الحساب فوراً
-                    </>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

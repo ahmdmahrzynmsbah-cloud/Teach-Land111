@@ -29,6 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 interface FinancesManagerProps {
@@ -47,17 +48,59 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
   const [expenses, setExpenses] = useState<any[]>([]);
   
   // Form states for adding expense
-  const [expenseTitle, setExpenseTitle] = useState('');
+  const [expenseTitle, setExpenseTitle] = useState('راتب معلم');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('رواتب ومكافآت');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [addingExpense, setAddingExpense] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [newTitleInput, setNewTitleInput] = useState('');
+  
+  const [availableCategories, setAvailableCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('finance_categories');
+    return saved ? JSON.parse(saved) : [
+      'رواتب ومكافآت', 'صيانة وتشغيل', 'إعلانات وتسويق', 'منصات وسيرفرات', 'أدوات ومستلزمات', 'أخرى'
+    ];
+  });
+
+  const [availableTitles, setAvailableTitles] = useState<string[]>(() => {
+    const saved = localStorage.getItem('finance_titles');
+    return saved ? JSON.parse(saved) : [
+      'راتب معلم', 'صيانة أجهزة', 'إعلان ممول', 'فاتورة إنترنت', 'أدوات مكتبية', 'أخرى'
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('finance_categories', JSON.stringify(availableCategories));
+  }, [availableCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('finance_titles', JSON.stringify(availableTitles));
+  }, [availableTitles]);
 
   // UI state for expandable teacher rows
   const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null);
 
-  // UI state for delete confirmation
-  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  // Custom confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type: 'delete' | 'warning';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'delete'
+  });
+
+  const [statementModalOpen, setStatementModalOpen] = useState(false);
+  const [statementStartDate, setStatementStartDate] = useState('');
+  const [statementEndDate, setStatementEndDate] = useState('');
+  const [statementGenerated, setStatementGenerated] = useState(false);
+
 
   useEffect(() => {
     setLoading(true);
@@ -83,7 +126,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
       // 2. Fetch Courses (Admin gets all, Teacher gets their own)
       const coursesRef = collection(db, 'courses');
       const qCourses = isTeacher 
-        ? query(coursesRef, where('teacherId', '==', userData.id))
+        ? query(coursesRef, where('teacherId', '==', userData?.id))
         : coursesRef;
       
       unsubscribeCourses = onSnapshot(qCourses, (snapshot) => {
@@ -169,23 +212,29 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
   };
 
   // Handle deleting expense (Admin only)
-  const confirmDeleteExpense = (id: string) => {
-    setExpenseToDelete(id);
-  };
-
-  const handleDeleteExpense = async () => {
-    if (!expenseToDelete) return;
-    try {
-      // In audit logs, we used exp_ prefix, so we must remove it to get the actual firebase document ID
-      const actualId = expenseToDelete.replace('exp_', '');
-      await deleteDoc(doc(db, 'expenses', actualId));
-      toast.success('تم حذف المصروف بنجاح');
-    } catch (err) {
-      console.error("Error deleting expense:", err);
-      toast.error('حدث خطأ أثناء حذف المصروف');
-    } finally {
-      setExpenseToDelete(null);
+  const handleDeleteExpense = async (id: string) => {
+    if (!isAdmin) {
+      toast.error('غير مسموح لك بحذف المصروفات');
+      return;
     }
+    
+    setConfirmModal({
+      isOpen: true,
+      title: 'تأكيد حذف المصروف نهائياً',
+      message: 'هل أنت متأكد من حذف هذا المصروف؟ لا يمكن استعادة البيانات بعد الحذف.',
+      type: 'delete',
+      onConfirm: async () => {
+        try {
+          const docRef = doc(db, 'expenses', id);
+          await deleteDoc(docRef);
+          toast.success('تم حذف المصروف بنجاح ✅');
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } catch (err) {
+          console.error("Error deleting expense:", err);
+          toast.error('حدث خطأ أثناء الحذف. تأكد من صلاحياتك وحاول مجدداً.');
+        }
+      }
+    });
   };
 
   // --- CALCULATION LOGIC ---
@@ -318,7 +367,20 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
   }
 
   return (
-    <div className="space-y-8" dir="rtl">
+    <div className="space-y-8 print:w-full print:block" dir="rtl">
+            <div className="flex justify-between items-center mb-4 print:hidden">
+        <h2 className="text-2xl font-black text-gray-900 dark:text-white">إدارة الحسابات والمالية</h2>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setStatementModalOpen(true)} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-purple-700 transition">
+            <FileText className="w-4 h-4" />
+            كشوف الحسابات
+          </button>
+          <button onClick={() => window.print()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            طباعة التقرير
+          </button>
+        </div>
+      </div>
       
       {/* 1. TOP METRICS PANEL */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -482,85 +544,198 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
                 تسجيل مصروفات جديدة
               </h3>
               
-              <form onSubmit={handleAddExpense} className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-gray-400 block mb-1">بيان الصرف / الوصف</label>
-                  <input
-                    type="text"
-                    value={expenseTitle}
-                    onChange={(e) => setExpenseTitle(e.target.value)}
-                    placeholder="مثال: فاتورة سيرفرات، مكافأة أستاذ، صيانة..."
-                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-2.5 outline-none focus:border-rose-500 dark:text-white font-bold text-xs"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleAddExpense} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-400 block mb-1">المبلغ (ج.م)</label>
+                    <label className="text-xs font-bold text-gray-500 block mb-2">المبلغ (ج.م)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={expenseAmount}
                       onChange={(e) => setExpenseAmount(e.target.value)}
                       placeholder="0.00"
-                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-2.5 outline-none focus:border-rose-500 dark:text-white font-bold text-xs font-mono"
+                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-3 outline-none focus:border-rose-500 dark:text-white font-bold text-sm font-mono transition-colors"
                       required
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-400 block mb-1">الفئة</label>
-                    <select
-                      value={expenseCategory}
-                      onChange={(e) => setExpenseCategory(e.target.value)}
-                      className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-2.5 outline-none focus:border-rose-500 text-xs font-bold text-gray-700 dark:text-gray-300"
-                    >
-                      <option value="رواتب ومكافآت">رواتب ومكافآت</option>
-                      <option value="صيانة وتشغيل">صيانة وتشغيل</option>
-                      <option value="إعلانات وتسويق">إعلانات وتسويق</option>
-                      <option value="منصات وسيرفرات">منصات وسيرفرات</option>
-                      <option value="أدوات ومستلزمات">أدوات ومستلزمات</option>
-                      <option value="أخرى">أخرى</option>
-                    </select>
+                    <label className="text-xs font-bold text-gray-500 block mb-2">تاريخ الصرف</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={expenseDate}
+                        onChange={(e) => setExpenseDate(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-3 outline-none focus:border-rose-500 dark:text-white font-bold text-sm transition-colors"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-gray-400 block mb-1">تاريخ الصرف</label>
-                  <input
-                    type="date"
-                    value={expenseDate}
-                    onChange={(e) => setExpenseDate(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-2.5 outline-none focus:border-rose-500 dark:text-white font-bold text-xs font-mono"
-                    required
-                  />
+                {/* Category Section */}
+                <div className="p-3 rounded-xl border border-gray-100 dark:border-[#2D2D3D] bg-gray-50/80 dark:bg-[#12121A] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">تصنيف المصروف (الفئة)</label>
+                    {availableCategories.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const categoryToDelete = expenseCategory;
+                          setConfirmModal({
+                            isOpen: true,
+                            title: 'حذف فئة مصروف',
+                            message: `هل أنت متأكد من حذف فئة "${categoryToDelete}" من القائمة؟ سيتم إزالتها من الخيارات المتاحة فقط.`,
+                            type: 'delete',
+                            onConfirm: () => {
+                              setAvailableCategories(prev => {
+                                const newCats = prev.filter(c => c !== categoryToDelete);
+                                if (newCats.length > 0) setExpenseCategory(newCats[0]);
+                                return newCats;
+                              });
+                              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                              toast.success('تم حذف الفئة من القائمة');
+                            }
+                          });
+                        }}
+                        className="text-[10px] text-red-500 hover:text-red-600 flex items-center gap-1 transition-colors p-1 font-black"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        حذف الفئة المختارة
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={expenseCategory}
+                    onChange={(e) => setExpenseCategory(e.target.value)}
+                    className="w-full bg-white dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 outline-none focus:border-rose-500 text-xs font-bold text-gray-800 dark:text-gray-200 transition-colors"
+                  >
+                    {availableCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="أو إضافة فئة..."
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      className="flex-1 bg-white dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 outline-none focus:border-rose-500 dark:text-white text-[10px] font-medium transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = newCategoryInput.trim();
+                        if (val && !availableCategories.includes(val)) {
+                          setAvailableCategories(prev => [...prev, val]);
+                          setExpenseCategory(val);
+                          setNewCategoryInput('');
+                        }
+                      }}
+                      className="bg-gray-200 dark:bg-[#2D2D3D] text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg text-[10px] font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      إضافة
+                    </button>
+                  </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={addingExpense}
-                  className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-xl py-3 text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-rose-500/20 disabled:opacity-50"
-                >
-                  {addingExpense ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      إضافة المصروف للدفتر
-                    </>
-                  )}
-                </button>
+                {/* Title Section */}
+                <div className="p-3 rounded-xl border border-gray-100 dark:border-[#2D2D3D] bg-gray-50/80 dark:bg-[#12121A] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">بيان الصرف (الوصف)</label>
+                    {availableTitles.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const titleToDelete = expenseTitle;
+                          setConfirmModal({
+                            isOpen: true,
+                            title: 'حذف مسمى مصروف',
+                            message: `هل أنت متأكد من حذف مسمى "${titleToDelete}" من القائمة؟`,
+                            type: 'delete',
+                            onConfirm: () => {
+                              setAvailableTitles(prev => {
+                                const newTitles = prev.filter(t => t !== titleToDelete);
+                                if (newTitles.length > 0) setExpenseTitle(newTitles[0]);
+                                return newTitles;
+                              });
+                              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                              toast.success('تم حذف المسمى من القائمة');
+                            }
+                          });
+                        }}
+                        className="text-[10px] text-red-500 hover:text-red-600 flex items-center gap-1 transition-colors p-1 font-black"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        حذف المسمى المختار
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={expenseTitle}
+                    onChange={(e) => setExpenseTitle(e.target.value)}
+                    className="w-full bg-white dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 outline-none focus:border-rose-500 text-xs font-bold text-gray-800 dark:text-gray-200 transition-colors"
+                  >
+                    {availableTitles.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="أو إضافة بيان..."
+                      value={newTitleInput}
+                      onChange={(e) => setNewTitleInput(e.target.value)}
+                      className="flex-1 bg-white dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 outline-none focus:border-rose-500 dark:text-white text-[10px] font-medium transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = newTitleInput.trim();
+                        if (val && !availableTitles.includes(val)) {
+                          setAvailableTitles(prev => [...prev, val]);
+                          setExpenseTitle(val);
+                          setNewTitleInput('');
+                        }
+                      }}
+                      className="bg-gray-200 dark:bg-[#2D2D3D] text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg text-[10px] font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      إضافة
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    disabled={addingExpense}
+                    className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-xl px-4 py-3.5 font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20"
+                  >
+                    {addingExpense ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        جاري التسجيل...
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-5 h-5" />
+                        تأكيد تسجيل المصروف
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
 
             {/* Expenses List Card */}
-            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden min-h-[350px]">
+            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden print:overflow-visible print:min-h-0 print:h-auto min-h-[350px]">
               <h3 className="text-base font-black text-gray-800 dark:text-white mb-3 flex items-center gap-2 shrink-0">
                 <FileText className="w-5 h-5 text-gray-400" />
                 دفتر المصروفات الأخير
               </h3>
 
-              <div className="flex-1 overflow-y-auto scrollbar-thin space-y-3 pl-1">
+              <div className="flex-1 overflow-y-auto print:overflow-visible scrollbar-thin space-y-3 pl-1">
                 {expenses.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
                     <AlertCircle className="w-8 h-8 opacity-40 mb-2" />
@@ -579,7 +754,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-extrabold text-rose-500 font-mono">-{exp.amount} ج.م</span>
                         <button
-                          onClick={() => confirmDeleteExpense(exp.id)}
+                          onClick={() => handleDeleteExpense(exp.id)}
                           className="p-1.5 text-gray-400 hover:text-rose-500 bg-white dark:bg-[#1A1A24] rounded-lg border border-gray-100 dark:border-[#2D2D3D] shadow-sm transition-all"
                           title="حذف المصروف"
                         >
@@ -596,7 +771,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
 
           {/* Admin Block B: Teachers & Courses financial list (7 Cols) */}
           <div className="lg:col-span-7 flex flex-col gap-8">
-            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden min-h-[500px]">
+            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden print:overflow-visible print:min-h-0 print:h-auto min-h-[500px]">
               <div className="flex justify-between items-center mb-6 shrink-0">
                 <div>
                   <h3 className="text-base font-black text-gray-800 dark:text-white">حسابات المعلمين التفصيلية</h3>
@@ -607,7 +782,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto scrollbar-thin space-y-3.5 pr-1">
+              <div className="flex-1 overflow-y-auto print:overflow-visible scrollbar-thin space-y-3.5 pr-1">
                 {teachers.length === 0 ? (
                   <div className="py-20 text-center text-gray-400">
                     <Users className="w-12 h-12 mx-auto opacity-30 mb-3" />
@@ -716,7 +891,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
             <FileText className="w-5 h-5 text-gray-400" />
             سجل العمليات (Audit Log)
           </h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto print:overflow-visible">
             <table className="w-full text-right text-xs">
               <thead>
                 <tr className="bg-gray-50 dark:bg-[#12121A] border-b border-gray-100 dark:border-[#2D2D3D] text-gray-500 font-bold">
@@ -735,7 +910,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
                 ) : (
                   auditLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50/50 dark:hover:bg-[#1A1A24]/30">
-                      <td className="p-3">
+                      <td className="p-3 text-gray-800 dark:text-gray-200 print:text-gray-800">
                         {log.type === 'income' ? (
                           <span className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-lg text-[10px] font-black inline-flex items-center gap-1">
                             <TrendingUp className="w-3 h-3" /> مبيعات
@@ -752,7 +927,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
                           {log.type === 'income' ? '+' : '-'}{log.amount.toLocaleString('ar-EG')} ج.م
                         </span>
                       </td>
-                      <td className="p-3">{log.user}</td>
+                      <td className="p-3 text-gray-800 dark:text-gray-200 print:text-gray-800">{log.user}</td>
                       <td className="p-3 text-[10px] text-gray-500 font-mono" dir="ltr">
                         {log.date ? new Date(log.date).toLocaleString('ar-EG') : 'غير متوفر'}
                       </td>
@@ -770,13 +945,13 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
           
           {/* Teacher Block A: My Courses Revenue Report (7 Cols) */}
           <div className="lg:col-span-7 flex flex-col gap-8">
-            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden min-h-[450px]">
+            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden print:overflow-visible print:min-h-0 print:h-auto min-h-[450px]">
               <div className="shrink-0">
                 <h3 className="text-base font-black text-gray-800 dark:text-white">إحصائيات أرباح كورساتي</h3>
                 <p className="text-xs text-gray-400 mt-1">تتبع الطلاب المشتركين بدقة والمدفوعات المعتمدة لكل كورس على حدة</p>
               </div>
 
-              <div className="mt-6 flex-1 overflow-y-auto scrollbar-thin">
+              <div className="mt-6 flex-1 overflow-y-auto print:overflow-visible scrollbar-thin">
                 {myCourses.length === 0 ? (
                   <div className="py-20 text-center text-gray-400">
                     <BookOpen className="w-12 h-12 mx-auto opacity-30 mb-3" />
@@ -828,13 +1003,13 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
 
           {/* Teacher Block B: Chronological Subscription Log (5 Cols) */}
           <div className="lg:col-span-5 flex flex-col gap-8">
-            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden min-h-[450px]">
+            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col flex-1 overflow-hidden print:overflow-visible print:min-h-0 print:h-auto min-h-[450px]">
               <h3 className="text-base font-black text-gray-800 dark:text-white mb-2 shrink-0">
                 سجل الاشتراكات الأخير
               </h3>
               <p className="text-xs text-gray-400 mb-4 shrink-0">تنبيهات فورية بآخر الطلاب المنضمين لكورساتك</p>
 
-              <div className="flex-1 overflow-y-auto scrollbar-thin space-y-3.5 pl-1">
+              <div className="flex-1 overflow-y-auto print:overflow-visible scrollbar-thin space-y-3.5 pl-1">
                 {myRecentSubscribedPayments.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
                     <Users className="w-10 h-10 opacity-30 mb-2" />
@@ -862,39 +1037,305 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {expenseToDelete && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1A1A24] rounded-3xl p-6 max-w-md w-full border border-gray-200 dark:border-[#2D2D3D] shadow-xl">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-950/30 text-rose-500 rounded-full flex items-center justify-center">
-                <AlertCircle className="w-8 h-8" />
+
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-[#1A1A24] rounded-3xl p-6 max-w-md w-full border border-gray-200 dark:border-[#2D2D3D] shadow-2xl"
+            >
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className={`w-16 h-16 ${confirmModal.type === 'delete' ? 'bg-rose-50 dark:bg-rose-950/30 text-rose-500' : 'bg-amber-50 dark:bg-amber-950/30 text-amber-500'} rounded-full flex items-center justify-center`}>
+                  {confirmModal.type === 'delete' ? <Trash2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 dark:text-white">{confirmModal.title}</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm font-medium">
+                    {confirmModal.message}
+                  </p>
+                </div>
+                <div className="flex gap-3 w-full mt-6">
+                  <button
+                    onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                    className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-[#2D2D3D] dark:hover:bg-[#3D3D52] text-gray-700 dark:text-white rounded-xl font-bold transition-colors text-sm"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    onClick={confirmModal.onConfirm}
+                    className={`flex-1 px-4 py-3 ${confirmModal.type === 'delete' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'} text-white rounded-xl font-bold transition-colors shadow-lg text-sm`}
+                  >
+                    تأكيد
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Statement Modal */}
+      {statementModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto print:static print:h-auto print:block print:p-0 print:z-auto">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm print:hidden" onClick={() => setStatementModalOpen(false)}></div>
+          <div className="relative bg-white dark:bg-[#1A1A24] rounded-3xl w-full max-w-5xl p-6 md:p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-2xl z-10 max-h-[90vh] overflow-y-auto flex flex-col md:flex-row gap-6 print:w-full print:max-w-none print:max-h-none print:h-auto print:overflow-visible print:bg-white print:text-black print:p-0 print:border-none print:shadow-none print:block">
+            
+            {/* Controls (Hidden in Print) */}
+            <div className="w-full md:w-80 space-y-4 md:border-l md:border-gray-150 md:pl-6 print:hidden shrink-0">
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-[#2D2D3D]">
+                <h3 className="font-black text-sm text-gray-800 dark:text-gray-200">تخصيص كشف الحساب</h3>
+                <button onClick={() => {setStatementModalOpen(false); setStatementGenerated(false);}} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#0D0D12] text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
               </div>
               <div>
-                <h3 className="text-lg font-black text-gray-900 dark:text-white">تأكيد الحذف</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm font-medium">
-                  هل أنت متأكد من رغبتك في حذف هذا المصروف بشكل نهائي؟ لا يمكن التراجع عن هذا الإجراء.
-                </p>
+                <label className="text-xs font-black text-gray-500 dark:text-gray-400 block mb-1">من تاريخ</label>
+                <div className="relative">
+                  <input 
+                    type="date" 
+                    value={statementStartDate}
+                    onChange={(e) => setStatementStartDate(e.target.value)}
+                    
+                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-3 pr-10 py-2.5 text-xs font-bold outline-none focus:border-purple-500 dark:text-white cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer" 
+                  />
+                  <Calendar className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
-              <div className="flex gap-3 w-full mt-6">
-                <button
-                  onClick={() => setExpenseToDelete(null)}
-                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-[#2D2D3D] dark:hover:bg-[#3D3D52] text-gray-700 dark:text-white rounded-xl font-bold transition-colors text-sm"
-                >
-                  إلغاء
-                </button>
-                <button
-                  onClick={handleDeleteExpense}
-                  className="flex-1 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-rose-500/20 text-sm"
-                >
-                  نعم، احذف
-                </button>
+              <div>
+                <label className="text-xs font-black text-gray-500 dark:text-gray-400 block mb-1">إلى تاريخ</label>
+                <div className="relative">
+                  <input 
+                    type="date" 
+                    value={statementEndDate}
+                    onChange={(e) => setStatementEndDate(e.target.value)}
+                    
+                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-3 pr-10 py-2.5 text-xs font-bold outline-none focus:border-purple-500 dark:text-white cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer" 
+                  />
+                  <Calendar className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
+              <button 
+                onClick={() => setStatementGenerated(true)}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md shadow-purple-600/20"
+              >
+                توليد كشف الحساب
+              </button>
+              
+              {statementGenerated && (
+                <button 
+                  onClick={() => window.print()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-3 rounded-xl transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                  طباعة الكشف
+                </button>
+              )}
+            </div>
+
+            
+            {/* Document Preview */}
+            <div className="flex-1 bg-white dark:bg-[#0D0D12] text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-[#2D2D3D] rounded-2xl p-6 md:p-8 flex flex-col shadow-sm print:border-none print:shadow-none print:p-0 min-h-[500px] print:bg-white print:text-black">
+              {!statementGenerated ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-400 print:hidden">
+                  <FileText className="w-16 h-16 mb-4 opacity-50" />
+                  <p className="font-bold">قم بتحديد التواريخ وتوليد الكشف للبدء</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Header */}
+                  <div className="flex justify-between items-start border-b border-gray-200 dark:border-[#2D2D3D] print:border-gray-200 pb-6">
+                    <div>
+                      <h2 className="text-2xl font-black text-gray-900 dark:text-white print:text-black">كشف حساب مالي تفصيلي</h2>
+                      <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mt-1">
+                        عن الفترة من: <span className="font-mono">{statementStartDate || 'البداية'}</span> إلى: <span className="font-mono">{statementEndDate || 'الآن'}</span>
+                      </p>
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-black text-lg text-[#00B4D8]">Teachland</h3>
+                      <p className="text-xs text-gray-400 font-bold">بوابة الإدارة المالية</p>
+                      <p className="text-xs text-gray-400 font-bold mt-1">تاريخ الطباعة: {new Date().toLocaleString('en-GB')}</p>
+                    </div>
+                  </div>
+
+                  {/* Calculations */}
+                  {(() => {
+                    const filteredPayments = payments.filter(p => {
+                      if (!p.createdAt) return false;
+                      const d = p.createdAt.split('T')[0];
+                      if (statementStartDate && d < statementStartDate) return false;
+                      if (statementEndDate && d > statementEndDate) return false;
+                      return true;
+                    });
+                    const filteredExpenses = expenses.filter(e => {
+                      if (!e.date) return false;
+                      if (statementStartDate && e.date < statementStartDate) return false;
+                      if (statementEndDate && e.date > statementEndDate) return false;
+                      return true;
+                    });
+
+                    let filteredTeacherPayments = filteredPayments;
+                    if (isTeacher) {
+                       filteredTeacherPayments = filteredPayments.filter(p => p.teacherId === userData?.id);
+                    }
+
+                    const totalRev = filteredTeacherPayments.reduce((acc, p) => acc + (p.coursePrice || p.amount || 0), 0);
+                    const totalExp = isAdmin ? filteredExpenses.reduce((acc, e) => acc + (e.amount || 0), 0) : 0;
+                    const net = totalRev - totalExp;
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+                          <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-3 rounded-xl border border-emerald-100 dark:border-emerald-800/30 print:border-emerald-100 print:bg-emerald-50">
+                            <p className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400 mb-1">إجمالي الإيرادات</p>
+                            <p className="text-base lg:text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono print:text-emerald-600 flex items-center gap-1 flex-wrap-reverse whitespace-nowrap">{totalRev.toLocaleString('ar-EG')} <span>ج.م</span></p>
+                            <p className="text-[10px] text-emerald-600/50 dark:text-emerald-500 mt-1 font-bold">{filteredTeacherPayments.length} عملية ناجحة</p>
+                          </div>
+                          {isAdmin && (
+                            <div className="bg-rose-50/50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-800/30 print:border-rose-100 print:bg-rose-50">
+                              <p className="text-xs font-bold text-rose-600/70 dark:text-rose-400 mb-1">إجمالي المصروفات</p>
+                              <p className="text-base lg:text-lg font-black text-rose-600 dark:text-rose-400 font-mono print:text-rose-600 flex items-center gap-1 flex-wrap-reverse whitespace-nowrap">{totalExp.toLocaleString('ar-EG')} <span>ج.م</span></p>
+                              <p className="text-[10px] text-rose-600/50 dark:text-rose-500 mt-1 font-bold">{filteredExpenses.length} عملية منصرف</p>
+                            </div>
+                          )}
+                          <div className="bg-blue-50/50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800/30 print:border-blue-100 print:bg-blue-50">
+                            <p className="text-xs font-bold text-blue-600/70 dark:text-blue-400 mb-1">الرصيد الصافي</p>
+                            <p className={"text-base lg:text-lg font-black font-mono print:text-blue-600 flex items-center gap-1 flex-wrap-reverse whitespace-nowrap " + (net >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400')}>
+                              {net.toLocaleString('ar-EG')} <span>ج.م</span>
+                            </p>
+                            <p className="text-[10px] text-blue-600/50 dark:text-blue-500 mt-1 font-bold">للفترة المحددة</p>
+                          </div>
+                          {isAdmin && (
+                             <div className="bg-amber-50/50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-800/30 print:border-amber-100 print:bg-amber-50">
+                              <p className="text-xs font-bold text-amber-600/70 dark:text-amber-400 mb-1">هامش الربح</p>
+                              <p className="text-base lg:text-lg font-black text-amber-600 dark:text-amber-400 font-mono print:text-amber-600">
+                                {totalRev > 0 ? Math.round((net / totalRev) * 100) : 0}%
+                              </p>
+                              <p className="text-[10px] text-amber-600/50 dark:text-amber-500 mt-1 font-bold">من إجمالي الإيرادات</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tables */}
+                        <div className="space-y-8">
+                          <div>
+                            <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#2D2D3D] print:border-gray-200 pb-2 mb-4">
+                              <h4 className="font-black text-gray-800 dark:text-gray-100 text-sm print:text-gray-800">تفصيل إيرادات المبيعات والاشتراكات</h4>
+                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#1A1A24] px-2 py-1 rounded-lg print:bg-gray-100 print:text-gray-500">{filteredTeacherPayments.length} عملية</span>
+                            </div>
+                            
+                            {filteredTeacherPayments.length > 0 ? (
+                              <div className="overflow-hidden border border-gray-200 dark:border-[#2D2D3D] rounded-xl print:border-gray-200">
+                                <table className="w-full text-right text-xs">
+                                  <thead className="bg-gray-50 dark:bg-[#1A1A24] text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-[#2D2D3D] print:bg-gray-50 print:border-gray-200">
+                                    <tr>
+                                      <th className="p-3 font-bold w-12 text-center text-gray-800 dark:text-gray-200 print:text-gray-800">م</th>
+                                      <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">التاريخ والوقت</th>
+                                      <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">اسم الطالب</th>
+                                      <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">البيان (الكورس)</th>
+                                      <th className="p-3 font-bold text-left text-gray-800 dark:text-gray-200 print:text-gray-800">المبلغ (ج.م)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100 dark:divide-[#2D2D3D] print:divide-gray-100">
+                                    {filteredTeacherPayments.map((p, index) => {
+                                      const d = new Date(p.createdAt);
+                                      return (
+                                      <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-[#12121A] transition-colors print:hover:bg-transparent">
+                                        <td className="p-3 text-center font-bold text-gray-400 dark:text-gray-500 print:text-gray-400">{index + 1}</td>
+                                        <td className="p-3 font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap print:text-gray-500">
+                                          {d.toLocaleDateString('en-GB')} <span className="text-[10px] opacity-70 ml-1">{d.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</span>
+                                        </td>
+                                        <td className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">{p.userName || p.studentName || 'طالب'}</td>
+                                        <td className="p-3 text-gray-800 dark:text-gray-200 print:text-gray-800">{p.courseTitle || 'اشتراك كورس'}</td>
+                                        <td className="p-3 font-mono text-emerald-600 font-bold text-left">{(p.coursePrice || p.amount || 0).toLocaleString('ar-EG')}</td>
+                                      </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                  <tfoot className="bg-gray-50 dark:bg-[#12121A] border-t border-gray-200 dark:border-[#2D2D3D] print:bg-gray-50 print:border-gray-200">
+                                    <tr>
+                                      <td colSpan={4} className="p-3 font-black text-gray-700 dark:text-gray-200 text-left print:text-gray-700">إجمالي الإيرادات</td>
+                                      <td className="p-3 font-black font-mono text-emerald-600 text-left">{totalRev.toLocaleString('ar-EG')}</td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-50 dark:bg-[#12121A] rounded-xl p-8 text-center border border-gray-100 dark:border-[#2D2D3D] print:bg-gray-50 print:border-gray-100">
+                                <p className="text-sm text-gray-500 font-bold">لا توجد عمليات إيرادات في هذه الفترة.</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {isAdmin && (
+                            <div>
+                              <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#2D2D3D] print:border-gray-200 pb-2 mb-4">
+                                <h4 className="font-black text-gray-800 dark:text-gray-100 text-sm print:text-gray-800">تفصيل المصروفات والمنصرف</h4>
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#1A1A24] px-2 py-1 rounded-lg print:bg-gray-100 print:text-gray-500">{filteredExpenses.length} عملية</span>
+                              </div>
+                              {filteredExpenses.length > 0 ? (
+                                <div className="overflow-hidden border border-gray-200 dark:border-[#2D2D3D] rounded-xl print:border-gray-200">
+                                  <table className="w-full text-right text-xs">
+                                    <thead className="bg-gray-50 dark:bg-[#1A1A24] text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-[#2D2D3D] print:bg-gray-50 print:border-gray-200">
+                                      <tr>
+                                        <th className="p-3 font-bold w-12 text-center text-gray-800 dark:text-gray-200 print:text-gray-800">م</th>
+                                        <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">تاريخ الصرف</th>
+                                        <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">التصنيف</th>
+                                        <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">البيان</th>
+                                        <th className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">بواسطة</th>
+                                        <th className="p-3 font-bold text-left text-gray-800 dark:text-gray-200 print:text-gray-800">المبلغ (ج.م)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-[#2D2D3D] print:divide-gray-100">
+                                      {filteredExpenses.map((e, index) => (
+                                        <tr key={e.id} className="hover:bg-gray-50/50 dark:hover:bg-[#12121A] transition-colors print:hover:bg-transparent">
+                                          <td className="p-3 text-center font-bold text-gray-400 dark:text-gray-500 print:text-gray-400">{index + 1}</td>
+                                          <td className="p-3 font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap print:text-gray-500">{e.date || '-'}</td>
+                                          <td className="p-3 text-gray-800 dark:text-gray-200 print:text-gray-800">
+                                            <span className="bg-gray-100 dark:bg-[#1A1A24] text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded text-[10px] font-bold print:bg-gray-100 print:text-gray-600">
+                                              {e.category || '-'}
+                                            </span>
+                                          </td>
+                                          <td className="p-3 font-bold text-gray-800 dark:text-gray-200 print:text-gray-800">{e.title || '-'}</td>
+                                          <td className="p-3 text-gray-500 dark:text-gray-400 print:text-gray-500">{e.addedBy || '-'}</td>
+                                          <td className="p-3 font-mono text-rose-600 font-bold text-left">{(e.amount || 0).toLocaleString('ar-EG')}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    <tfoot className="bg-gray-50 dark:bg-[#12121A] border-t border-gray-200 dark:border-[#2D2D3D] print:bg-gray-50 print:border-gray-200">
+                                      <tr>
+                                        <td colSpan={5} className="p-3 font-black text-gray-700 dark:text-gray-200 text-left print:text-gray-700">إجمالي المصروفات</td>
+                                        <td className="p-3 font-black font-mono text-rose-600 text-left">{totalExp.toLocaleString('ar-EG')}</td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="bg-gray-50 dark:bg-[#12121A] rounded-xl p-8 text-center border border-gray-100 dark:border-[#2D2D3D] print:bg-gray-50 print:border-gray-100">
+                                  <p className="text-sm text-gray-500 font-bold">لا توجد عمليات صرف في هذه الفترة.</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="pt-8 mt-12 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500">
+                           <p>تم استخراج هذا الكشف آلياً من منصة Teachland ولا يحتاج إلى ختم.</p>
+                           <p>توقيع الإدارة: ..............................</p>
+                        </div>
+                      </>
+                    );
+                                   })()}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

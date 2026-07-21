@@ -1,0 +1,24 @@
+{
+  "short_name": "Teachland",
+  "name": "Teachland - المنصة التعليمية المتكاملة",
+  "description": "منصة تعليمية تفاعلية متكاملة للمرحلتين الإعدادية والثانوية والقدرات والتحصيلي",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/education.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/education.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0D0D12",
+  "theme_color": "#00B4D8",
+  "display": "standalone",
+  "orientation": "portrait"
+}

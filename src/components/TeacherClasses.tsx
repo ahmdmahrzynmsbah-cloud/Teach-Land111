@@ -718,7 +718,6 @@ export default function TeacherClasses({ userData }: TeacherClassesProps) {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <Toaster position="top-center" reverseOrder={false} />
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">كورساتي</h2>

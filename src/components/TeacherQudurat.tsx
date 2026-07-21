@@ -27,6 +27,7 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft' | 'hidden'>('all');
 
   // Form states
+  const [contentType, setContentType] = useState<'video_course' | 'pdf_book' | 'exam'>('video_course');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [thumbnail, setThumbnail] = useState('');
@@ -180,6 +181,7 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
   // Open modal for creating
   const handleOpenCreate = () => {
     setEditingReview(null);
+    setContentType('video_course');
     setTitle('');
     setDescription('');
     setThumbnail('');
@@ -213,6 +215,7 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
   // Open modal for editing
   const handleOpenEdit = (review: QuduratReview) => {
     setEditingReview(review);
+    setContentType(review.contentType || 'video_course');
     setTitle(review.title);
     setDescription(review.description);
     setThumbnail(review.thumbnail);
@@ -243,8 +246,25 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
   // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !thumbnail.trim() || !subject.trim() || !grade.trim() || (!videoUrl.trim() && !bunnyVideoId.trim()) || !duration.trim()) {
-      toast.error('الرجاء تعبئة جميع الحقول المطلوبة بما في ذلك فيديو المراجعة');
+    if (!title.trim() || !description.trim() || !thumbnail.trim() || !subject.trim() || !grade.trim()) {
+      toast.error('الرجاء تعبئة جميع الحقول الأساسية');
+      return;
+    }
+    
+    if (contentType === 'video_course') {
+      if ((!videoUrl.trim() && !bunnyVideoId.trim()) || !duration.trim()) {
+        toast.error('الرجاء تعبئة جميع الحقول المطلوبة بما في ذلك فيديو المراجعة ومدة المراجعة');
+        return;
+      }
+    }
+    
+    if (contentType === 'pdf_book' && !pdfUrl.trim()) {
+      toast.error('الرجاء رفع أو إرفاق رابط ملف PDF');
+      return;
+    }
+
+    if (contentType === 'exam' && !examId.trim()) {
+      toast.error('الرجاء تحديد الاختبار المرتبط');
       return;
     }
 
@@ -486,6 +506,24 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+                          
+                          {/* Content Type Badge Overlay */}
+                          {review.contentType === 'pdf_book' && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                              <div className="bg-rose-600/90 backdrop-blur-md px-3 py-2 rounded-2xl flex flex-col items-center gap-1 shadow-2xl border border-rose-400/30">
+                                <FileText className="w-6 h-6 text-white" />
+                                <span className="text-white font-black text-[10px]">ملف / مذكرة</span>
+                              </div>
+                            </div>
+                          )}
+                          {review.contentType === 'exam' && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                              <div className="bg-emerald-600/90 backdrop-blur-md px-3 py-2 rounded-2xl flex flex-col items-center gap-1 shadow-2xl border border-emerald-400/30">
+                                <Award className="w-6 h-6 text-white" />
+                                <span className="text-white font-black text-[10px]">اختبار إلكتروني</span>
+                              </div>
+                            </div>
+                          )}
                   
                   {/* Category Badges */}
                   <div className="absolute top-3 right-3 flex flex-wrap gap-1.5">
@@ -575,15 +613,15 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                         {hasDiscount ? (
                           <>
                             <span className="text-base font-black text-purple-600 dark:text-purple-400">
-                              {review.discountPrice} ر.س
+                              {review.discountPrice} ج.م
                             </span>
                             <span className="text-xs text-gray-400 line-through">
-                              {review.price} ر.س
+                              {review.price} ج.م
                             </span>
                           </>
                         ) : (
                           <span className="text-base font-black text-purple-600 dark:text-purple-400">
-                            {review.price === 0 ? 'مجاني' : `${review.price} ر.س`}
+                            {review.price === 0 ? 'مجاني' : `${review.price} ج.م`}
                           </span>
                         )}
                       </div>
@@ -652,6 +690,35 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
               {/* Modal Body */}
               <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar text-right">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  
+                  {/* Content Type */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">نوع المحتوى:</label>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setContentType('video_course')}
+                        className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${contentType === 'video_course' ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-500 text-purple-700 dark:text-purple-400' : 'bg-white dark:bg-[#1A1A24] border-gray-200 dark:border-[#2D2D3D] text-gray-600 dark:text-gray-400'}`}
+                      >
+                        <Video className="w-4 h-4 inline-block ml-1.5" /> كورس مسجل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContentType('pdf_book')}
+                        className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${contentType === 'pdf_book' ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-500 text-rose-700 dark:text-rose-400' : 'bg-white dark:bg-[#1A1A24] border-gray-200 dark:border-[#2D2D3D] text-gray-600 dark:text-gray-400'}`}
+                      >
+                        <FileText className="w-4 h-4 inline-block ml-1.5" /> ملف أسئلة / مذكرة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContentType('exam')}
+                        className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${contentType === 'exam' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 text-emerald-700 dark:text-emerald-400' : 'bg-white dark:bg-[#1A1A24] border-gray-200 dark:border-[#2D2D3D] text-gray-600 dark:text-gray-400'}`}
+                      >
+                        <Award className="w-4 h-4 inline-block ml-1.5" /> اختبار إلكتروني
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Title */}
                   <div className="sm:col-span-2 space-y-1.5">
                     <label className="text-xs font-black text-gray-700 dark:text-gray-300">عنوان المراجعة (مثال: الشامل في فيزياء القدرات):</label>
@@ -675,8 +742,7 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                     />
                   </div>
-
-                  {/* Subject and Grade */}
+{/* Subject and Grade */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-black text-gray-700 dark:text-gray-300">المادة الدراسية:</label>
                     <input
@@ -792,6 +858,8 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                     </div>
                   </div>
 
+                  {contentType === 'video_course' && (
+                  <>
                   {/* Video Selector */}
                   <div className="sm:col-span-2 space-y-2">
                     <label className="text-xs font-black text-gray-700 dark:text-gray-300">الفيديو الترويجي أو الدرس المفتوح (Preview Video):</label>
@@ -866,10 +934,11 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                       </div>
                     </div>
                   </div>
-
-                  {/* Pricing and Discount */}
+</>
+)}
+{/* Pricing and Discount */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">السعر الأساسي (ر.س):</label>
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">السعر الأساسي (ج.م):</label>
                     <input
                       type="number"
                       required
@@ -880,7 +949,7 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">السعر بعد الخصم (ر.س - اختياري):</label>
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300">السعر بعد الخصم (ج.م - اختياري):</label>
                     <input
                       type="number"
                       min={0}
@@ -991,6 +1060,8 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                     </div>
                   </div>
 
+                  {contentType === 'video_course' && (
+                  <>
                   {/* Lessons Count and Duration */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-black text-gray-700 dark:text-gray-300">عدد دروس المراجعة بالفيديو:</label>
@@ -1013,6 +1084,8 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
+                  </>
+                  )}
 
                   {/* Publish Status */}
                   <div className="space-y-1.5">

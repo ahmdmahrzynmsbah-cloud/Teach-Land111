@@ -442,7 +442,7 @@ export default function AdminCoursesPanel() {
 
               <form onSubmit={handleSavePrice} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 mb-1">سعر الاشتراك الجديد (بالجنيه المصري)</label>
+                  <label className="block text-xs font-bold text-gray-400 mb-1">سعر الاشتراك الجديد (بالج.م المصري)</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 right-3 flex items-center text-gray-400 text-xs font-bold">ج.م</span>
                     <input
