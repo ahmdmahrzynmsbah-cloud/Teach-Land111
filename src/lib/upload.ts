@@ -274,7 +274,7 @@ export async function uploadChunkedFile(
   
   return new Promise(async (resolve, reject) => {
     try {
-      const chunkSize = 2 * 1024 * 1024; // 2MB chunks
+      const chunkSize = 500 * 1024; // 500KB chunks (safe for 1MB limits)
       const totalChunks = Math.ceil(file.size / chunkSize);
       const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
@@ -286,7 +286,7 @@ export async function uploadChunkedFile(
         const formData = new FormData();
         formData.append('chunkIndex', i.toString());
         formData.append('fileId', fileId);
-        formData.append('chunk', chunk);
+        formData.append('chunk', chunk, `chunk-${i}.bin`);
 
         const response = await fetch('/api/upload-chunk', {
           method: 'POST',
