@@ -1,3 +1,10 @@
+export interface CustomPaymentMethod {
+  id: string;
+  name: string;
+  details: string;
+  isEnabled: boolean;
+}
+
 export interface PlatformSettings {
   platformName: string;
   logoChar: string;
@@ -20,6 +27,7 @@ export interface PlatformSettings {
   isInstapayEnabled?: boolean;
   bankAccountDetails?: string;
   isBankAccountEnabled?: boolean;
+  customPaymentMethods?: CustomPaymentMethod[];
   subjects?: { id: string; title: string; iconName: string; color: string }[];
   contactPhone?: string;
   contactEmail?: string;

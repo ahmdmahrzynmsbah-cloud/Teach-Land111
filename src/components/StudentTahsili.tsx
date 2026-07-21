@@ -48,6 +48,7 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
   const isInstapayEnabled = platformSettings.isInstapayEnabled ?? false;
   const instapayHandle = platformSettings.instapayHandle || "";
   const isBankAccountEnabled = platformSettings.isBankAccountEnabled ?? false;
+  const customPaymentMethods = platformSettings.customPaymentMethods || [];
   const bankAccountDetails = platformSettings.bankAccountDetails || "";
 
   // local state for watched lessons map, key: reviewId_lessonIndex -> boolean
@@ -419,11 +420,19 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                     const discount = review.discountPrice !== undefined && review.discountPrice !== null && review.discountPrice < review.price;
                     const displayPrice = discount ? review.discountPrice : review.price;
 
+                    const isPdf = review.contentType === 'pdf_book';
+                    const isExam = review.contentType === 'exam';
+                    const cardStyleClass = isPdf 
+                      ? 'border-rose-200 dark:border-rose-950/50 hover:border-rose-400 dark:hover:border-rose-800/80 shadow-rose-100/10 dark:shadow-none hover:shadow-rose-500/5' 
+                      : isExam 
+                      ? 'border-emerald-200 dark:border-emerald-950/50 hover:border-emerald-400 dark:hover:border-emerald-800/80 shadow-emerald-100/10 dark:shadow-none hover:shadow-emerald-500/5' 
+                      : 'border-gray-150 dark:border-[#2D2D3D] hover:border-purple-300 dark:hover:border-purple-800/80 shadow-gray-100/10 dark:shadow-none hover:shadow-purple-500/5';
+
                     return (
                       <motion.div
                         key={review.id}
                         whileHover={{ y: -5 }}
-                        className="bg-white dark:bg-[#1A1A24] border border-gray-150 dark:border-[#2D2D3D] rounded-3xl overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col justify-between group cursor-pointer"
+                        className={`bg-white dark:bg-[#1A1A24] border ${cardStyleClass} rounded-3xl overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col justify-between group cursor-pointer`}
                         onClick={() => setSelectedReview(review)}
                       >
                         {/* Thumbnail */}
@@ -473,6 +482,19 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                             <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-md text-[9px] font-black">
                               مدفوع
                             </span>
+                            {review.contentType === 'pdf_book' ? (
+                              <span className="px-2 py-0.5 bg-rose-600 text-white rounded-md text-[9px] font-black flex items-center gap-0.5">
+                                <FileText className="w-2.5 h-2.5" /> ملف PDF
+                              </span>
+                            ) : review.contentType === 'exam' ? (
+                              <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md text-[9px] font-black flex items-center gap-0.5">
+                                <Award className="w-2.5 h-2.5" /> اختبار
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-purple-600 text-white rounded-md text-[9px] font-black flex items-center gap-0.5">
+                                <Film className="w-2.5 h-2.5" /> كورس مسجل
+                              </span>
+                            )}
                           </div>
 
                           {/* Lock / Unlock Icon Overlay */}
@@ -822,8 +844,8 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                       </div>
                     )}
 
-                    {/* PROGRESS CARD - IF PURCHASED */}
-                    {purchased && (
+                    {/* PROGRESS CARD - IF PURCHASED AND CONTENT IS VIDEO */}
+                    {purchased && (!review.contentType || review.contentType === 'video_course') && (
                       <div className="bg-white dark:bg-[#1A1A24] border border-gray-150 dark:border-[#2D2D3D] rounded-3xl p-6 shadow-sm space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-xs font-black text-gray-900 dark:text-white">معدل الإنجاز والتقدم:</h3>
@@ -847,89 +869,158 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                       </div>
                     )}
 
-                    {/* LESSONS PLAYLIST SIDEBAR */}
-                    <div className="bg-white dark:bg-[#1A1A24] border border-gray-150 dark:border-[#2D2D3D] rounded-3xl overflow-hidden shadow-sm flex flex-col">
-                      <div className="p-4 bg-gray-50 dark:bg-[#1C1C28] border-b border-gray-100 dark:border-[#2D2D3D]">
-                        <h3 className="text-xs font-black text-gray-900 dark:text-white flex items-center gap-2">
-                          <Layers className="w-4 h-4 text-purple-600" />
-                          <span>فهرس ودروس المراجعة</span>
-                        </h3>
+                    {/* PDF BOOK CARD - IF PURCHASED AND CONTENT IS PDF */}
+                    {purchased && review.contentType === 'pdf_book' && (
+                      <div className="bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/10 dark:to-rose-900/5 border border-rose-100 dark:border-rose-950 rounded-3xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-gray-900 dark:text-white">الملف جاهز للتحميل 📄</h4>
+                            <span className="text-[10px] font-bold text-gray-400">صيغة الملف: PDF عالي الجودة</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-bold">
+                          يمكنك تصفح المذكرة وتحميلها مباشرة للطباعة أو المذاكرة على جهازك بالضغط على الزر أدناه.
+                        </p>
+                        {review.pdfUrl ? (
+                          <button
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = review.pdfUrl || '';
+                              link.target = '_blank';
+                              link.download = review.title || 'document';
+                              link.rel = 'noopener noreferrer';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs transition-colors cursor-pointer border-0 flex items-center justify-center gap-2 shadow-md shadow-rose-600/10"
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>تحميل المذكرة الآن</span>
+                          </button>
+                        ) : (
+                          <p className="text-xs text-rose-500 font-bold">يرجى من المعلم إرفاق ملف المذكرة.</p>
+                        )}
                       </div>
+                    )}
 
-                      <div className="max-h-96 overflow-y-auto divide-y divide-gray-50 dark:divide-[#2D2D3D] custom-scrollbar">
-                        {lessons.map((lesson, idx) => {
-                          const isFree = lesson.isFree;
-                          const locked = !purchased && !isFree;
-                          const isActive = activeLessonIndex === idx;
-                          const isWatched = watchedLessons[`${review.id}_${idx}`];
+                    {/* EXAM CARD - IF PURCHASED AND CONTENT IS EXAM */}
+                    {purchased && review.contentType === 'exam' && (
+                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/10 dark:to-emerald-900/5 border border-emerald-100 dark:border-emerald-950 rounded-3xl p-6 shadow-sm space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                            <Award className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-gray-900 dark:text-white">الاختبار الإلكتروني جاهز 🏆</h4>
+                            <span className="text-[10px] font-bold text-gray-400">تفاعلي بالكامل مع التصحيح الفوري</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-bold">
+                          اضغط على الزر أدناه لبدء حل اختبار التقييم لقياس مدى استيعابك للمفاهيم والحصول على الدرجة فوراً.
+                        </p>
+                        {review.examId ? (
+                          <button
+                            onClick={() => navigate(`/exam/${review.examId}`)}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs transition-colors cursor-pointer border-0 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/10"
+                          >
+                            <Award className="w-4 h-4" />
+                            <span>ابدأ حل الاختبار الآن</span>
+                          </button>
+                        ) : (
+                          <p className="text-xs text-emerald-500 font-bold">يرجى من المعلم إرفاق الاختبار المرتبط.</p>
+                        )}
+                      </div>
+                    )}
 
-                          return (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                if (!locked) {
-                                  setActiveLessonIndex(idx);
-                                } else {
-                                  toast.error('الرجاء شراء المراجعة لفتح هذا الدرس المدفوع');
-                                }
-                              }}
-                              className={`p-4 flex gap-3 text-right cursor-pointer transition-all ${
-                                isActive 
-                                  ? 'bg-purple-500/5 dark:bg-purple-500/10 border-r-4 border-purple-600' 
-                                  : 'hover:bg-gray-50 dark:hover:bg-[#1F1F2C]'
-                              } ${locked ? 'opacity-65' : ''}`}
-                            >
-                              {/* Left status indicator */}
-                              <div className="shrink-0 flex items-start pt-1">
-                                {locked ? (
-                                  <div className="w-7 h-7 bg-gray-100 dark:bg-[#20202D] text-gray-400 rounded-lg flex items-center justify-center">
-                                    <Lock className="w-3.5 h-3.5" />
-                                  </div>
-                                ) : isWatched ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleWatched(review.id, idx);
-                                    }}
-                                    className="w-7 h-7 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 border border-emerald-200 dark:border-emerald-900/30 rounded-lg flex items-center justify-center cursor-pointer"
-                                  >
-                                    <CheckCircle className="w-4 h-4" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleWatched(review.id, idx);
-                                    }}
-                                    className="w-7 h-7 bg-purple-50 dark:bg-purple-950/20 text-purple-500 border border-purple-200 dark:border-purple-900/30 rounded-lg flex items-center justify-center hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer"
-                                  >
-                                    <PlayCircle className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
+                    {/* LESSONS PLAYLIST SIDEBAR - ONLY FOR VIDEOS */}
+                    {(!review.contentType || review.contentType === 'video_course') && (
+                      <div className="bg-white dark:bg-[#1A1A24] border border-gray-150 dark:border-[#2D2D3D] rounded-3xl overflow-hidden shadow-sm flex flex-col">
+                        <div className="p-4 bg-gray-50 dark:bg-[#1C1C28] border-b border-gray-100 dark:border-[#2D2D3D]">
+                          <h3 className="text-xs font-black text-gray-900 dark:text-white flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-purple-600" />
+                            <span>فهرس ودروس المراجعة</span>
+                          </h3>
+                        </div>
 
-                              {/* Middle texts */}
-                              <div className="flex-1 space-y-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h4 className={`text-xs font-black truncate ${isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
-                                    {lesson.title}
-                                  </h4>
-                                  {isFree && (
-                                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 rounded text-[8.5px] font-black shrink-0">
-                                      مفتوح مجاناً
-                                    </span>
+                        <div className="max-h-96 overflow-y-auto divide-y divide-gray-50 dark:divide-[#2D2D3D] custom-scrollbar">
+                          {lessons.map((lesson, idx) => {
+                            const isFree = lesson.isFree;
+                            const locked = !purchased && !isFree;
+                            const isActive = activeLessonIndex === idx;
+                            const isWatched = watchedLessons[`${review.id}_${idx}`];
+
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  if (!locked) {
+                                    setActiveLessonIndex(idx);
+                                  } else {
+                                    toast.error('الرجاء شراء المراجعة لفتح هذا الدرس المدفوع');
+                                  }
+                                }}
+                                className={`p-4 flex gap-3 text-right cursor-pointer transition-all ${
+                                  isActive 
+                                    ? 'bg-purple-500/5 dark:bg-purple-500/10 border-r-4 border-purple-600' 
+                                    : 'hover:bg-gray-50 dark:hover:bg-[#1F1F2C]'
+                                } ${locked ? 'opacity-65' : ''}`}
+                              >
+                                {/* Left status indicator */}
+                                <div className="shrink-0 flex items-start pt-1">
+                                  {locked ? (
+                                    <div className="w-7 h-7 bg-gray-100 dark:bg-[#20202D] text-gray-400 rounded-lg flex items-center justify-center">
+                                      <Lock className="w-3.5 h-3.5" />
+                                    </div>
+                                  ) : isWatched ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleWatched(review.id, idx);
+                                      }}
+                                      className="w-7 h-7 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 border border-emerald-200 dark:border-emerald-900/30 rounded-lg flex items-center justify-center cursor-pointer"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleWatched(review.id, idx);
+                                      }}
+                                      className="w-7 h-7 bg-purple-50 dark:bg-purple-950/20 text-purple-500 border border-purple-200 dark:border-purple-900/30 rounded-lg flex items-center justify-center hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer"
+                                    >
+                                      <PlayCircle className="w-4 h-4" />
+                                    </button>
                                   )}
                                 </div>
-                                <p className="text-[10px] text-gray-500 dark:text-slate-400 line-clamp-1 font-bold">
-                                  {lesson.description}
-                                </p>
-                                <span className="text-[9.5px] text-gray-400 dark:text-gray-500 font-bold block">{lesson.duration}</span>
+
+                                {/* Middle texts */}
+                                <div className="flex-1 space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className={`text-xs font-black truncate ${isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
+                                      {lesson.title}
+                                    </h4>
+                                    {isFree && (
+                                      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 rounded text-[8.5px] font-black shrink-0">
+                                        مفتوح مجاناً
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-500 dark:text-slate-400 line-clamp-1 font-bold">
+                                    {lesson.description}
+                                  </p>
+                                  <span className="text-[9.5px] text-gray-400 dark:text-gray-500 font-bold block">{lesson.duration}</span>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                 </div>
@@ -985,7 +1076,7 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                     رصيد المحفظة
                   </button>
                   
-                  {(isVodafoneCashEnabled || isInstapayEnabled || isBankAccountEnabled) && (
+                  {(isVodafoneCashEnabled || isInstapayEnabled || isBankAccountEnabled || customPaymentMethods.some(m => m.isEnabled)) && (
                     <button
                       onClick={() => setPaymentMethod('vodafone')}
                       className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${
@@ -1168,6 +1259,23 @@ export default function StudentTahsili({ userData, setUserData, initialSelectedR
                                 </div>
                               </div>
                             )}
+                            {customPaymentMethods?.filter(m => m.isEnabled).map(method => (
+                              <div key={method.id} className="flex flex-col gap-2 bg-white dark:bg-[#12121A] border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3">
+                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{method.name}</span>
+                                <div className="flex items-start justify-between">
+                                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                                    {method.details}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyText(method.details)}
+                                    className="p-2 bg-gray-50 hover:bg-emerald-50 dark:bg-[#1A1A24] dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg transition-all active:scale-95 border border-gray-100 dark:border-[#2D2D3D] shrink-0 mr-3"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                           
                           <p className="text-[10.5px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed text-right mt-4">

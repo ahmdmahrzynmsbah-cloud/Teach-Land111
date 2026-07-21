@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, Video, Eye, EyeOff, Save, Trash2, Edit2, Star, Sparkles, 
   Check, Play, Clock, BookOpen, Layers, Award, Film, Loader2, Search, X, ChevronRight, CheckCircle2,
-  Upload, Link, FileText
+  Upload, Link, FileText, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, where, getDocs, onSnapshot, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -296,6 +296,7 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
       grade: grade.trim(),
       teacherName: userData.name,
       teacherId: userData.id,
+      contentType: contentType,
       videoUrl: finalVideoUrl,
       bunnyVideoId: bunnyVideoId.trim() || null,
       pdfUrl: pdfUrl.trim() || null,
@@ -592,18 +593,44 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
 
                   {/* Stat Bar */}
                   <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 font-bold border-t border-b border-gray-100 dark:border-[#2D2D3D] py-2.5">
-                    <span className="flex items-center gap-1">
-                      <Play className="w-3.5 h-3.5 text-purple-500" />
-                      <span>{review.lessonsCount} درس مراجعة</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-purple-500" />
-                      <span>مدة {review.duration}</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5 text-purple-500" />
-                      <span>{review.enrolledStudentIds?.length || 0} طالب</span>
-                    </span>
+                    {(!review.contentType || review.contentType === 'video_course') ? (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Play className="w-3.5 h-3.5 text-purple-500" />
+                          <span>{review.lessonsCount} درس مراجعة</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-purple-500" />
+                          <span>مدة {review.duration}</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-purple-500" />
+                          <span>{review.enrolledStudentIds?.length || 0} طالب</span>
+                        </span>
+                      </>
+                    ) : review.contentType === 'pdf_book' ? (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-rose-500" />
+                          <span>مذكرة دراسية (PDF)</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-rose-500" />
+                          <span>{review.enrolledStudentIds?.length || 0} طالب</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>اختبار إلكتروني تفاعلي</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>{review.enrolledStudentIds?.length || 0} طالب</span>
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* Pricing and Action buttons */}
@@ -1040,11 +1067,22 @@ export default function TeacherTahsili({ userData }: TeacherTahsiliProps) {
                             className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
                           >
                             <option value="">-- اختر اختبارًا من اختباراتك --</option>
-                            {teacherQuizzes.map((q) => (
-                              <option key={q.id} value={q.id}>
-                                {q.title || q.name || q.id}
-                              </option>
-                            ))}
+                            {teacherQuizzes.filter(q => q.courseId === 'tahsili').length > 0 && (
+                              <optgroup label="اختبارات موجهة للتحصيلي">
+                                {teacherQuizzes.filter(q => q.courseId === 'tahsili').map((q) => (
+                                  <option key={q.id} value={q.id}>
+                                    {q.title || q.name || q.id}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            <optgroup label="اختبارات أخرى">
+                              {teacherQuizzes.filter(q => q.courseId !== 'tahsili').map((q) => (
+                                <option key={q.id} value={q.id}>
+                                  {q.title || q.name || q.id}
+                                </option>
+                              ))}
+                            </optgroup>
                           </select>
                           
                           <div className="relative flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-[#2D2D3D]">

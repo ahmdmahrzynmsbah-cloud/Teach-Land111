@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, updateDoc, doc, deleteDoc, getDoc, setDoc, onSnapshot, arrayUnion, arrayRemove, addDoc, query, orderBy, where, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db, storage, auth } from '../lib/firebase';
 import { usePlatformSettings } from '../context/PlatformSettingsContext';
 import { 
   Users, BookOpen, Shield, Trash2, Edit2, Edit3, Loader2, CheckCircle2, 
@@ -93,6 +93,9 @@ const getMockReportRecords = (role: string, rangeType: 'all' | 'month' | 'custom
 };
 
 const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers: React.Dispatch<React.SetStateAction<any[]>>, payments: any[] }) => {
+  const [walletSubTab, setWalletSubTab] = useState<'charge' | 'requests'>('charge');
+  
+  // Direct charge states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [amount, setAmount] = useState('');
@@ -101,6 +104,16 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
   const [rechargeCodes, setRechargeCodes] = useState<any[]>([]);
   const [loadingCodes, setLoadingCodes] = useState(false);
   const [codeToDelete, setCodeToDelete] = useState<string | null>(null);
+
+  // Transfer requests states
+  const [chargeRequests, setChargeRequests] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [requestsSearch, setRequestsSearch] = useState('');
+  const [requestsStatusFilter, setRequestsStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
+  const [rejectingRequest, setRejectingRequest] = useState<any | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
 
   // Filter students based on search query
   const filteredStudents = users.filter(u => 
@@ -130,6 +143,31 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
 
   useEffect(() => {
     fetchRechargeCodes();
+  }, []);
+
+  // Real-time listener for transfer recharge requests
+  useEffect(() => {
+    setLoadingRequests(true);
+    const q = collection(db, 'wallet_charge_requests');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach(docSnap => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      // Sort by date descending
+      list.sort((a, b) => {
+        const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tB - tA;
+      });
+      setChargeRequests(list);
+      setLoadingRequests(false);
+    }, (error) => {
+      console.error("Error listening to transfer charge requests:", error);
+      setLoadingRequests(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleDirectCharge = async () => {
@@ -222,301 +260,573 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
     }
   };
 
+  // Transfer approvals handlers
+  const handleApproveTransfer = async (req: any) => {
+    setProcessingRequestId(req.id);
+    try {
+      const studentRef = doc(db, 'users', req.studentId);
+      const studentSnap = await getDoc(studentRef);
+      const currentBalance = studentSnap.exists() ? (studentSnap.data()?.balance || 0) : 0;
+      const newBalance = currentBalance + req.amount;
+
+      // 1. Update user balance in Firestore
+      await updateDoc(studentRef, { balance: newBalance });
+
+      // 2. Add transaction history in transactions
+      await addDoc(collection(db, 'transactions'), {
+        userId: req.studentId,
+        chargedBy: 'admin_transfer_approval',
+        type: 'charge',
+        amount: req.amount,
+        codeUsed: 'TRANSFER_RECHARGE_APPROVED',
+        description: `شحن رصيد بموافقة التحويل الإلكتروني والبنكي بقيمة ${req.amount} ج.م`,
+        createdAt: new Date().toISOString()
+      });
+
+      // 3. Update the request document
+      await updateDoc(doc(db, 'wallet_charge_requests', req.id), {
+        status: 'approved',
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: auth.currentUser?.email || 'admin'
+      });
+
+      // 4. Update local state
+      setUsers(prev => prev.map(u => u.id === req.studentId ? { ...u, balance: newBalance } : u));
+      if (selectedStudent?.id === req.studentId) {
+        setSelectedStudent(prev => prev ? { ...prev, balance: newBalance } : null);
+      }
+
+      toast.success(`تم اعتماد العملية وشحن رصيد ${req.amount} ج.م للطالب ${req.studentName} بنجاح! 🎉`);
+    } catch (err) {
+      console.error("Error approving transfer recharge request:", err);
+      toast.error("فشل في اعتماد عملية الشحن");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  const handleRejectTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingRequest) return;
+
+    setProcessingRequestId(rejectingRequest.id);
+    try {
+      await updateDoc(doc(db, 'wallet_charge_requests', rejectingRequest.id), {
+        status: 'rejected',
+        adminNotes: rejectionReason,
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: auth.currentUser?.email || 'admin'
+      });
+
+      toast.success(`تم رفض طلب شحن الطالب ${rejectingRequest.studentName} بنجاح ❌`);
+      setRejectingRequest(null);
+      setRejectionReason('');
+    } catch (err) {
+      console.error("Error rejecting transfer recharge request:", err);
+      toast.error("فشل في رفض طلب الشحن");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  // Filter transfer requests based on search and status
+  const filteredRequests = chargeRequests.filter(req => {
+    const matchesSearch = 
+      (req.studentName || '').toLowerCase().includes(requestsSearch.toLowerCase()) ||
+      (req.studentPhone || '').includes(requestsSearch) ||
+      (req.studentEmail || '').toLowerCase().includes(requestsSearch.toLowerCase());
+    
+    const matchesStatus = requestsStatusFilter === 'all' || req.status === requestsStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const pendingRequestsCount = chargeRequests.filter(r => r.status === 'pending').length;
+
   // Calculate total amount student has paid
   const studentPayments = payments.filter(p => p.userId === selectedStudent?.id && p.status === 'approved');
   const totalPaid = studentPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300" dir="rtl">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Right column: Search & Select Student */}
-        <div className="lg:col-span-1 bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-4">
-          <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#00B4D8] dark:text-[#D4AF37]" /> البحث عن طالب
-          </h3>
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث باسم الطالب، رقم الهاتف..."
-              className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl pr-9 pl-4 py-3 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-sm font-bold text-gray-900 dark:text-white"
+    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300" dir="rtl">
+      {/* Sub-Tabs Selector */}
+      <div className="flex gap-6 border-b border-gray-100 dark:border-[#2D2D3D] pb-3.5">
+        <button
+          onClick={() => setWalletSubTab('charge')}
+          className={`pb-2 text-sm font-black transition-all relative border-0 bg-transparent cursor-pointer ${
+            walletSubTab === 'charge'
+              ? 'text-[#00B4D8] dark:text-[#D4AF37]'
+              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+          }`}
+        >
+          شحن الرصيد المباشر وتوليد الكروت
+          {walletSubTab === 'charge' && (
+            <motion.div 
+              layoutId="walletSubTabBorder" 
+              className="absolute -bottom-[15px] left-0 right-0 h-[3px] bg-[#00B4D8] dark:bg-[#D4AF37] rounded-t-full shadow-sm" 
             />
+          )}
+        </button>
+
+        <button
+          onClick={() => setWalletSubTab('requests')}
+          className={`pb-2 text-sm font-black transition-all relative border-0 bg-transparent cursor-pointer flex items-center gap-1.5 ${
+            walletSubTab === 'requests'
+              ? 'text-[#00B4D8] dark:text-[#D4AF37]'
+              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+          }`}
+        >
+          <span>طلبات الشحن بالتحويل البنكي ({pendingRequestsCount})</span>
+          {pendingRequestsCount > 0 && (
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+          )}
+          {walletSubTab === 'requests' && (
+            <motion.div 
+              layoutId="walletSubTabBorder" 
+              className="absolute -bottom-[15px] left-0 right-0 h-[3px] bg-[#00B4D8] dark:bg-[#D4AF37] rounded-t-full shadow-sm" 
+            />
+          )}
+        </button>
+      </div>
+
+      {walletSubTab === 'charge' ? (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Right column: Search & Select Student */}
+            <div className="lg:col-span-1 bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-4">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#00B4D8] dark:text-[#D4AF37]" /> البحث عن طالب
+              </h3>
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="ابحث باسم الطالب، رقم الهاتف..."
+                  className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl pr-9 pl-4 py-3 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-sm font-bold text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                {(searchQuery ? filteredStudents : users.filter(u => u.role === 'student' || !u.role)).length > 0 ? (
+                  (searchQuery ? filteredStudents : users.filter(u => u.role === 'student' || !u.role)).slice(0, 50).map(student => (
+                    <button
+                      key={student.id}
+                      onClick={() => {
+                        setSelectedStudent(student);
+                        setGeneratedCode(null);
+                      }}
+                      className={`w-full text-right p-3 rounded-2xl border text-sm font-bold flex items-center justify-between transition-all ${
+                        selectedStudent?.id === student.id
+                          ? 'border-[#00B4D8] dark:border-[#D4AF37] bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 text-[#00B4D8] dark:text-[#D4AF37]'
+                          : 'border-gray-100 dark:border-[#2D2D3D] hover:bg-gray-50 dark:hover:bg-[#15151F] text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-black">{student.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 font-bold mt-1">{student.phone || 'بدون هاتف'}</p>
+                      </div>
+                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-1 rounded-full font-black">
+                        {student.grade === '1' ? 'الصف الأول' : student.grade === '2' ? 'الصف الثاني' : 'الصف الثالث'}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-4 font-bold">
+                    {searchQuery ? 'لا يوجد نتائج بحث مطابقة' : 'لا يوجد طلاب مسجلين بالمنصة حالياً'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Left column: Student Details & Actions */}
+            <div className="lg:col-span-2 space-y-6">
+              {selectedStudent ? (
+                <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
+                  {/* Student Header Info */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-gray-100 dark:border-[#2D2D3D]">
+                    <div>
+                      <h4 className="text-xl font-black text-gray-900 dark:text-white">{selectedStudent.name}</h4>
+                      <p className="text-xs font-bold text-gray-400 mt-1">{selectedStudent.email || 'لا يوجد بريد إلكتروني مسجل'}</p>
+                    </div>
+                    <span className="bg-[#00B4D8]/10 text-[#00B4D8] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] text-xs font-black px-3 py-1.5 rounded-full">
+                      طالب نشط بالمنصة 🎓
+                    </span>
+                  </div>
+
+                  {/* Financial Balance Summary */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-gray-50 dark:bg-[#0D0D12]/50 border border-gray-100 dark:border-[#2D2D3D] rounded-2xl p-4 flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mb-0.5">الرصيد المتاح حالياً</p>
+                        <p className="text-lg font-black text-gray-900 dark:text-white">{(selectedStudent.balance || 0).toLocaleString('ar-EG')} ج.م</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 dark:bg-[#0D0D12]/50 border border-gray-100 dark:border-[#2D2D3D] rounded-2xl p-4 flex items-center gap-4">
+                      <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/30 rounded-xl flex items-center justify-center text-amber-500 shrink-0">
+                        <DollarSign className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mb-0.5">إجمالي المدفوعات المعتمدة</p>
+                        <p className="text-lg font-black text-gray-900 dark:text-white">{totalPaid.toLocaleString('ar-EG')} ج.م</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recharge Input & Form */}
+                  <div className="space-y-4">
+                    <label className="text-xs font-black text-gray-500 dark:text-gray-400">مبلغ الشحن المطلوب:</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {['50', '100', '150', '200', '300', '500'].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setAmount(val)}
+                          className={`py-2 px-3 text-xs font-black rounded-xl border transition-all cursor-pointer ${
+                            amount === val
+                              ? 'border-[#00B4D8] dark:border-[#D4AF37] bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37]'
+                              : 'border-gray-100 dark:border-[#2D2D3D] hover:bg-gray-50 dark:hover:bg-[#15151F] text-gray-600 dark:text-gray-400'
+                          }`}
+                        >
+                          {val} ج.م
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="أو أدخل مبلغاً مخصصاً هنا..."
+                        className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-sm font-bold text-gray-900 dark:text-white font-mono"
+                      />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">ج.م</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleGenerateCode}
+                      disabled={loading || !amount}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-[#00B4D8] to-[#0077B6] dark:from-[#D4AF37] dark:to-[#B8860B] hover:opacity-90 disabled:opacity-50 text-white rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 duration-200 cursor-pointer border-0"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Ticket className="w-4 h-4" />
+                      )}
+                      <span>توليد كارت شحن (كود تفعيل)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDirectCharge}
+                      disabled={loading || !amount}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 duration-200 cursor-pointer border-0"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Wallet className="w-4 h-4" />
+                      )}
+                      <span>شحن مباشر فورياً للمحفظة</span>
+                    </button>
+                  </div>
+
+                  {/* Display Generated Code Result */}
+                  <AnimatePresence>
+                    {generatedCode && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="p-6 bg-amber-50 dark:bg-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-800/50 rounded-3xl text-center space-y-4"
+                      >
+                        <div>
+                          <span className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-1">كارت شحن Teachland جاهز للاستخدام! 🎫</span>
+                          <h5 className="text-sm font-bold text-gray-500 dark:text-gray-400">أرسل هذا الكود للطالب ليقوم بتفعيله وشحن محفظته تلقائياً:</h5>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                          <div className="bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl px-6 py-3 font-mono text-lg font-black text-gray-900 dark:text-white select-all">
+                            {generatedCode}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(generatedCode);
+                              toast.success('تم نسخ كود الشحن بنجاح! 📋');
+                            }}
+                            className="flex items-center gap-1.5 px-4 py-3 bg-[#00B4D8] dark:bg-[#D4AF37] hover:opacity-90 text-white rounded-2xl text-xs font-black transition-all shadow-sm active:scale-95 border-0 cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            نسخ الكود
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-[#1A1A24] p-8 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm text-center space-y-4 py-16">
+                  <div className="w-16 h-16 bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] rounded-full flex items-center justify-center mx-auto">
+                    <UserIcon className="w-8 h-8" />
+                  </div>
+                  <h4 className="text-lg font-black text-gray-900 dark:text-white">يرجى تحديد طالب من قائمة البحث أولاً 👆</h4>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-bold max-w-sm mx-auto">
+                    ابحث عن اسم الطالب المطلوب، ثم حدده لعرض تفاصيله المالية، كشف مدفوعاته، وإتمام عمليات شحن الرصيد له.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
-            {(searchQuery ? filteredStudents : users.filter(u => u.role === 'student' || !u.role)).length > 0 ? (
-              (searchQuery ? filteredStudents : users.filter(u => u.role === 'student' || !u.role)).slice(0, 50).map(student => (
-                <button
-                  key={student.id}
-                  onClick={() => {
-                    setSelectedStudent(student);
-                    setGeneratedCode(null);
-                  }}
-                  className={`w-full text-right p-3 rounded-2xl border text-sm font-bold flex items-center justify-between transition-all ${
-                    selectedStudent?.id === student.id
-                      ? 'border-[#00B4D8] dark:border-[#D4AF37] bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 text-[#00B4D8] dark:text-[#D4AF37]'
-                      : 'border-gray-100 dark:border-[#2D2D3D] hover:bg-gray-50 dark:hover:bg-[#15151F] text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-black">{student.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-bold mt-1">{student.phone || 'بدون هاتف'}</p>
-                  </div>
-                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-1 rounded-full font-black">
-                    {student.grade === '1' ? 'الصف الأول' : student.grade === '2' ? 'الصف الثاني' : 'الصف الثالث'}
-                  </span>
-                </button>
-              ))
+          {/* Recent Recharge Codes generated */}
+          <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-[#2D2D3D]">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <History className="w-5 h-5 text-gray-400" /> كروت الشحن وأكواد التفعيل المصدرة حديثاً
+              </h3>
+              <button
+                onClick={fetchRechargeCodes}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors bg-transparent border-0 cursor-pointer"
+                title="تحديث القائمة"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingCodes ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {loadingCodes ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="w-6 h-6 text-[#00B4D8] dark:text-[#D4AF37] animate-spin" />
+              </div>
+            ) : rechargeCodes.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right border-collapse text-xs md:text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 dark:border-[#2D2D3D] text-gray-400 font-black">
+                      <th className="pb-3 pt-1">كود التفعيل</th>
+                      <th className="pb-3 pt-1">القيمة</th>
+                      <th className="pb-3 pt-1">صادر للطالب</th>
+                      <th className="pb-3 pt-1">الحالة</th>
+                      <th className="pb-3 pt-1">تاريخ الإصدار</th>
+                      <th className="pb-3 pt-1 text-center">إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 dark:divide-[#2D2D3D]/50 font-bold">
+                    {rechargeCodes.map(codeDoc => (
+                      <tr key={codeDoc.code} className="hover:bg-gray-50/50 dark:hover:bg-[#15151F]/40 transition-colors">
+                        <td className="py-4 font-mono font-black text-[#00B4D8] dark:text-[#D4AF37]">{codeDoc.code}</td>
+                        <td className="py-4">{codeDoc.amount.toLocaleString('ar-EG')} ج.م</td>
+                        <td className="py-4">
+                          <div>
+                            <p className="text-gray-900 dark:text-white">{codeDoc.generatedForName || 'غير محدد'}</p>
+                            <p className="text-[10px] text-gray-400 font-bold">{codeDoc.generatedForPhone || ''}</p>
+                          </div>
+                        </td>
+                        <td className="py-4">
+                          {codeDoc.used ? (
+                            <span className="bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 text-[10px] px-2.5 py-1 rounded-full font-black">
+                              مستخدمة ❌
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-black">
+                              جاهزة للاستخدام ✨
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 text-gray-400 text-xs">
+                          {new Date(codeDoc.createdAt).toLocaleDateString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-4 text-center">
+                          <div className="flex justify-center items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(codeDoc.code);
+                                toast.success('تم نسخ كود الشحن بنجاح! 📋');
+                              }}
+                              className="p-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border-0 cursor-pointer"
+                              title="نسخ الكود"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCodeToDelete(codeDoc.id || codeDoc.code)}
+                              className="p-1.5 bg-red-50 dark:bg-red-950/20 text-red-500 hover:text-red-700 rounded-lg border-0 cursor-pointer"
+                              title="حذف الكارت"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
-              <p className="text-xs text-gray-400 text-center py-4 font-bold">
-                {searchQuery ? 'لا يوجد نتائج بحث مطابقة' : 'لا يوجد طلاب مسجلين بالمنصة حالياً'}
-              </p>
+              <p className="text-xs text-gray-400 text-center py-8 font-bold">لا توجد أكواد تفعيل مولدة حالياً</p>
             )}
           </div>
         </div>
-
-        {/* Left column: Student Details & Actions */}
-        <div className="lg:col-span-2 space-y-6">
-          {selectedStudent ? (
-            <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
-              {/* Student Header Info */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-gray-100 dark:border-[#2D2D3D]">
-                <div>
-                  <h4 className="text-xl font-black text-gray-900 dark:text-white">{selectedStudent.name}</h4>
-                  <p className="text-xs font-bold text-gray-400 mt-1">{selectedStudent.email || 'لا يوجد بريد إلكتروني مسجل'}</p>
-                </div>
-                <span className="bg-[#00B4D8]/10 text-[#00B4D8] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] text-xs font-black px-3 py-1.5 rounded-full">
-                  طالب نشط بالمنصة 🎓
-                </span>
-              </div>
-
-              {/* Financial Balance Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-gray-50 dark:bg-[#0D0D12]/50 border border-gray-100 dark:border-[#2D2D3D] rounded-2xl p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">
-                    <Wallet className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mb-0.5">الرصيد المتاح حالياً</p>
-                    <p className="text-lg font-black text-gray-900 dark:text-white">{(selectedStudent.balance || 0).toLocaleString('ar-EG')} ج.م</p>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 dark:bg-[#0D0D12]/50 border border-gray-100 dark:border-[#2D2D3D] rounded-2xl p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/30 rounded-xl flex items-center justify-center text-amber-500 shrink-0">
-                    <DollarSign className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mb-0.5">إجمالي المدفوعات المعتمدة</p>
-                    <p className="text-lg font-black text-gray-900 dark:text-white">{totalPaid.toLocaleString('ar-EG')} ج.م</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recharge Input & Form */}
-              <div className="space-y-4">
-                <label className="text-xs font-black text-gray-500 dark:text-gray-400">مبلغ الشحن المطلوب:</label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {['50', '100', '150', '200', '300', '500'].map(val => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setAmount(val)}
-                      className={`py-2 px-3 text-xs font-black rounded-xl border transition-all ${
-                        amount === val
-                          ? 'border-[#00B4D8] dark:border-[#D4AF37] bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37]'
-                          : 'border-gray-100 dark:border-[#2D2D3D] hover:bg-gray-50 dark:hover:bg-[#15151F] text-gray-600 dark:text-gray-400'
-                      }`}
-                    >
-                      {val} ج.م
-                    </button>
-                  ))}
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="أو أدخل مبلغاً مخصصاً هنا..."
-                    className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-sm font-bold text-gray-900 dark:text-white"
-                  />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">ج.م</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+      ) : (
+        /* Bank Transfer Requests sub-tab view */
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header Controls */}
+          <div className="bg-white dark:bg-[#1A1A24] p-5 rounded-3xl border border-gray-100 dark:border-[#2D2D3D] shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-black text-gray-400">حالة الطلب:</span>
+              {(['all', 'pending', 'approved', 'rejected'] as const).map(status => (
                 <button
-                  type="button"
-                  onClick={handleGenerateCode}
-                  disabled={loading || !amount}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-[#00B4D8] to-[#0077B6] dark:from-[#D4AF37] dark:to-[#B8860B] hover:opacity-90 disabled:opacity-50 text-white rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 duration-200 cursor-pointer"
+                  key={status}
+                  onClick={() => setRequestsStatusFilter(status)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black cursor-pointer border-0 transition-all ${
+                    requestsStatusFilter === status
+                      ? 'bg-[#00B4D8] text-white dark:bg-[#D4AF37] dark:text-gray-950 shadow-sm'
+                      : 'bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-[#12121A] dark:text-gray-400 dark:hover:bg-gray-800'
+                  }`}
                 >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Ticket className="w-4 h-4" />
-                  )}
-                  <span>توليد كارت شحن (كود تفعيل)</span>
+                  {status === 'all' && 'الكل'}
+                  {status === 'pending' && 'قيد الانتظار ⏳'}
+                  {status === 'approved' && 'مقبولة 🎉'}
+                  {status === 'rejected' && 'مرفوضة ❌'}
                 </button>
+              ))}
+            </div>
 
-                <button
-                  type="button"
-                  onClick={handleDirectCharge}
-                  disabled={loading || !amount}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 duration-200 cursor-pointer"
+            <div className="relative w-full md:w-72">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={requestsSearch}
+                onChange={(e) => setRequestsSearch(e.target.value)}
+                placeholder="ابحث باسم الطالب، الهاتف، البريد..."
+                className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl pr-9 pl-4 py-2.5 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-xs font-bold text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          {loadingRequests ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="w-8 h-8 text-[#00B4D8] dark:text-[#D4AF37] animate-spin" />
+              <p className="text-xs text-gray-400 font-bold">جاري تحميل طلبات التحويل البنكي...</p>
+            </div>
+          ) : filteredRequests.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredRequests.map(req => (
+                <div 
+                  key={req.id}
+                  className="bg-white dark:bg-[#1A1A24] rounded-3xl p-6 border border-gray-200 dark:border-[#2D2D3D] shadow-sm flex flex-col justify-between gap-5 hover:shadow-md transition-all relative overflow-hidden"
                 >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Wallet className="w-4 h-4" />
-                  )}
-                  <span>شحن مباشر فورياً للمحفظة</span>
-                </button>
-              </div>
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-3 text-right">
+                      {/* Name & Phone */}
+                      <div>
+                        <h4 className="text-base font-black text-gray-900 dark:text-white">{req.studentName}</h4>
+                        <p className="text-xs font-bold text-gray-400 mt-0.5">{req.studentPhone || 'بدون رقم هاتف'}</p>
+                        <p className="text-[10px] text-gray-400 font-bold mt-0.5">{req.studentEmail || ''}</p>
+                      </div>
 
-              {/* Display Generated Code Result */}
-              <AnimatePresence>
-                {generatedCode && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="p-6 bg-amber-50 dark:bg-amber-950/20 border-2 border-dashed border-amber-300 dark:border-amber-800/50 rounded-3xl text-center space-y-4"
-                  >
-                    <div>
-                      <span className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-1">كارت شحن Teachland جاهز للاستخدام! 🎫</span>
-                      <h5 className="text-sm font-bold text-gray-500 dark:text-gray-400">أرسل هذا الكود للطالب ليقوم بتفعيله وشحن محفظته تلقائياً:</h5>
+                      {/* Request Info */}
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black text-gray-400">قيمة الشحن المطلوبة:</span>
+                        <p className="text-2xl font-black text-[#00B4D8] dark:text-[#D4AF37] font-mono">
+                          {req.amount.toLocaleString('ar-EG')} <span className="text-xs font-bold text-gray-500">ج.م</span>
+                        </p>
+                      </div>
+
+                      <div className="text-[10px] text-gray-400 font-bold">
+                        تاريخ التقديم: {new Date(req.createdAt).toLocaleDateString('ar-EG', {
+                          year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        })}
+                      </div>
+
+                      {/* Review details for approved/rejected */}
+                      {req.status !== 'pending' && (
+                        <div className="p-3 rounded-2xl bg-gray-50 dark:bg-[#12121A] border border-gray-100 dark:border-[#2D2D3D]/50 text-[10px] leading-relaxed text-gray-500 space-y-1">
+                          <p><span className="font-black text-gray-700 dark:text-gray-300">مراجعة بواسطة:</span> {req.reviewedBy}</p>
+                          <p><span className="font-black text-gray-700 dark:text-gray-300">تاريخ المراجعة:</span> {new Date(req.reviewedAt).toLocaleString('ar-EG')}</p>
+                          {req.status === 'rejected' && req.adminNotes && (
+                            <p className="text-rose-500"><span className="font-black">سبب الرفض:</span> {req.adminNotes}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                      <div className="bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl px-6 py-3 font-mono text-lg font-black text-gray-900 dark:text-white select-all">
-                        {generatedCode}
+                    {/* Receipt thumbnail */}
+                    {req.receiptUrl && (
+                      <div className="relative group shrink-0 w-24 h-32 rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white dark:bg-gray-800">
+                        <img src={req.receiptUrl} alt="Receipt image" className="w-full h-full object-cover" />
+                        <button 
+                          type="button"
+                          onClick={() => setSelectedReceipt(req.receiptUrl)}
+                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-300 border-0 cursor-pointer"
+                        >
+                          <Eye className="w-6 h-6 scale-90 group-hover:scale-100 transition-transform" />
+                        </button>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Actions for Pending requests */}
+                  {req.status === 'pending' && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-50 dark:border-[#2D2D3D]/50">
                       <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(generatedCode);
-                          toast.success('تم نسخ كود الشحن بنجاح! 📋');
-                        }}
-                        className="flex items-center gap-1.5 px-4 py-3 bg-[#00B4D8] dark:bg-[#D4AF37] hover:opacity-90 text-white rounded-2xl text-xs font-black transition-all shadow-sm active:scale-95"
+                        onClick={() => handleApproveTransfer(req)}
+                        disabled={processingRequestId !== null}
+                        className="py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-black rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer border-0"
                       >
-                        <Copy className="w-3.5 h-3.5" />
-                        نسخ الكود
+                        {processingRequestId === req.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>قبول واعتماد الشحن</span>
+                      </button>
+
+                      <button
+                        onClick={() => setRejectingRequest(req)}
+                        disabled={processingRequestId !== null}
+                        className="py-2.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white disabled:opacity-50 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer border-0"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>رفض الطلب</span>
                       </button>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  )}
+
+                  {/* Badges for status */}
+                  {req.status === 'approved' && (
+                    <div className="absolute top-4 left-4 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      تم القبول وشحن الرصيد 🎉
+                    </div>
+                  )}
+                  {req.status === 'rejected' && (
+                    <div className="absolute top-4 left-4 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                      طلب مرفوض ❌
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           ) : (
-            <div className="bg-white dark:bg-[#1A1A24] p-8 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm text-center space-y-4 py-16">
-              <div className="w-16 h-16 bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] rounded-full flex items-center justify-center mx-auto">
-                <UserIcon className="w-8 h-8" />
-              </div>
-              <h4 className="text-lg font-black text-gray-900 dark:text-white">يرجى تحديد طالب من قائمة البحث أولاً 👆</h4>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-bold max-w-sm mx-auto">
-                ابحث عن اسم الطالب المطلوب، ثم حدده لعرض تفاصيله المالية، كشف مدفوعاته، وإتمام عمليات شحن الرصيد له.
-              </p>
+            <div className="p-12 text-center bg-white dark:bg-[#1A1A24] rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm font-bold text-gray-400">
+              لا توجد أي طلبات شحن تحويل تطابق فلترة البحث حالياً.
             </div>
           )}
         </div>
-      </div>
-
-      {/* Recent Recharge Codes generated */}
-      <div className="bg-white dark:bg-[#1A1A24] p-6 rounded-3xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
-        <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-[#2D2D3D]">
-          <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
-            <History className="w-5 h-5 text-gray-400" /> كروت الشحن وأكواد التفعيل المصدرة حديثاً
-          </h3>
-          <button
-            onClick={fetchRechargeCodes}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title="تحديث القائمة"
-          >
-            <RefreshCw className={`w-4 h-4 ${loadingCodes ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {loadingCodes ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-6 h-6 text-[#00B4D8] dark:text-[#D4AF37] animate-spin" />
-          </div>
-        ) : rechargeCodes.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-xs md:text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 dark:border-[#2D2D3D] text-gray-400 font-black">
-                  <th className="pb-3 pt-1">كود التفعيل</th>
-                  <th className="pb-3 pt-1">القيمة</th>
-                  <th className="pb-3 pt-1">صادر للطالب</th>
-                  <th className="pb-3 pt-1">الحالة</th>
-                  <th className="pb-3 pt-1">تاريخ الإصدار</th>
-                  <th className="pb-3 pt-1 text-center">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-[#2D2D3D]/50 font-bold">
-                {rechargeCodes.map(codeDoc => (
-                  <tr key={codeDoc.code} className="hover:bg-gray-50/50 dark:hover:bg-[#15151F]/40 transition-colors">
-                    <td className="py-4 font-mono font-black text-[#00B4D8] dark:text-[#D4AF37]">{codeDoc.code}</td>
-                    <td className="py-4">{codeDoc.amount.toLocaleString('ar-EG')} ج.م</td>
-                    <td className="py-4">
-                      <div>
-                        <p className="text-gray-900 dark:text-white">{codeDoc.generatedForName || 'غير محدد'}</p>
-                        <p className="text-[10px] text-gray-400 font-bold">{codeDoc.generatedForPhone || ''}</p>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      {codeDoc.used ? (
-                        <span className="bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 text-[10px] px-2.5 py-1 rounded-full font-black">
-                          مستخدمة ❌
-                        </span>
-                      ) : (
-                        <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-black">
-                          جاهزة للاستخدام ✨
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 text-gray-400 text-xs">
-                      {new Date(codeDoc.createdAt).toLocaleDateString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="py-4 text-center">
-                      <div className="flex justify-center items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(codeDoc.code);
-                            toast.success('تم نسخ كود الشحن بنجاح! 📋');
-                          }}
-                          className="p-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg"
-                          title="نسخ الكود"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCodeToDelete(codeDoc.id || codeDoc.code)}
-                          className="p-1.5 bg-red-50 dark:bg-red-950/20 text-red-500 hover:text-red-700 rounded-lg"
-                          title="حذف الكارت"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400 text-center py-8 font-bold">لا توجد أكواد تفعيل مولدة حالياً</p>
-        )}
-      </div>
+      )}
 
       {/* Confirmation Modal for deletion */}
       <AnimatePresence>
@@ -547,18 +857,97 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
                 <button
                   type="button"
                   onClick={() => executeDeleteCode(codeToDelete)}
-                  className="bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-2xl shadow-md shadow-red-500/10 transition-colors cursor-pointer"
+                  className="bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-2xl shadow-md shadow-red-500/10 transition-colors cursor-pointer border-0"
                 >
                   حذف نهائي
                 </button>
                 <button
                   type="button"
                   onClick={() => setCodeToDelete(null)}
-                  className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-black py-3 rounded-2xl transition-colors cursor-pointer"
+                  className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-black py-3 rounded-2xl transition-colors cursor-pointer border-0"
                 >
                   إلغاء الحذف
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox Receipt modal */}
+      <AnimatePresence>
+        {selectedReceipt && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedReceipt(null)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[999] flex items-center justify-center p-4 cursor-zoom-out"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-lg w-full bg-white dark:bg-[#12121A] rounded-3xl overflow-hidden p-2 shadow-2xl"
+            >
+              <button 
+                onClick={() => setSelectedReceipt(null)}
+                className="absolute top-4 left-4 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer transition-all border-0 hover:scale-105 z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img src={selectedReceipt} alt="Full receipt" className="w-full max-h-[80vh] object-contain rounded-2xl" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Rejection modal prompt */}
+      <AnimatePresence>
+        {rejectingRequest && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-[#1A1A24] max-w-md w-full rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-[#2D2D3D] text-right space-y-4"
+              dir="rtl"
+            >
+              <h4 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-rose-500 animate-pulse" /> رفض طلب شحن الطالب: {rejectingRequest.studentName}
+              </h4>
+              <p className="text-xs font-bold text-gray-400">يرجى تحديد سبب رفض طلب الشحن لإعلام الطالب تلقائياً عبر حسابه:</p>
+
+              <form onSubmit={handleRejectTransfer} className="space-y-4">
+                <textarea
+                  required
+                  placeholder="مثال: لم يصل التحويل لحسابنا البنكي بعد، أو الصورة المرفقة ليست لإيصال الدفع..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8] text-xs font-bold text-gray-900 dark:text-white h-24 resize-none"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="submit"
+                    disabled={processingRequestId !== null || !rejectionReason.trim()}
+                    className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-black py-3 rounded-2xl shadow-md transition-all cursor-pointer border-0 text-xs"
+                  >
+                    {processingRequestId ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "تأكيد الرفض"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingRequest(null);
+                      setRejectionReason('');
+                    }}
+                    className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-black py-3 rounded-2xl transition-all cursor-pointer border-0 text-xs"
+                  >
+                    إلغاء التراجع
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
@@ -613,6 +1002,10 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
   const [processingPaymentId, setProcessingPaymentId] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [tempSubjects, setTempSubjects] = useState(platformSettings.subjects || []);
+  const [tempPaymentMethods, setTempPaymentMethods] = useState(platformSettings.customPaymentMethods || []);
+  const [newPaymentMethodName, setNewPaymentMethodName] = useState('');
+  const [newPaymentMethodDetails, setNewPaymentMethodDetails] = useState('');
+  const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [newSubjectTitle, setNewSubjectTitle] = useState('');
   const [newSubjectIcon, setNewSubjectIcon] = useState('BookOpen');
   const [newSubjectColor, setNewSubjectColor] = useState('bg-blue-100 text-blue-600');
@@ -910,7 +1303,9 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
     ), { duration: 4000 });
   };
 
-  const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
+  
+
+const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSavingSettings(true);
     const formData = new FormData(e.currentTarget);
@@ -947,6 +1342,7 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
         isInstapayEnabled: formData.get('isInstapayEnabled') === 'true',
         bankAccountDetails: (formData.get('bankAccountDetails') as string) || platformSettings.bankAccountDetails || '',
         isBankAccountEnabled: formData.get('isBankAccountEnabled') === 'true',
+        customPaymentMethods: tempPaymentMethods || [],
         subjects: tempSubjects || [],
         contactPhone: (formData.get('contactPhone') as string) || platformSettings.contactPhone || '',
         contactEmail: (formData.get('contactEmail') as string) || platformSettings.contactEmail || '',
@@ -2166,7 +2562,108 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
                           className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
                         />
                       </div>
+                    {/* Custom Payment Methods */}
+                    <div className="bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">💳</span>
+                          <h5 className="text-sm font-bold text-gray-900 dark:text-white">طرق دفع إضافية مخصصة</h5>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingPaymentMethod(!isAddingPaymentMethod)}
+                          className="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1 px-3 rounded-lg transition-colors"
+                        >
+                          + إضافة طريقة دفع
+                        </button>
+                      </div>
+
+                      {isAddingPaymentMethod && (
+                        <div className="bg-white dark:bg-[#1A1A24] border border-gray-150 dark:border-[#2D2D3D] rounded-xl p-3 mb-4 animate-in fade-in zoom-in-95">
+                          <div className="grid grid-cols-1 gap-3 mb-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">اسم طريقة الدفع</label>
+                              <input
+                                type="text"
+                                value={newPaymentMethodName}
+                                onChange={(e) => setNewPaymentMethodName(e.target.value)}
+                                placeholder="مثال: زين كاش, وي باي, الخ..."
+                                className="w-full bg-gray-50 dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 outline-none focus:border-emerald-500 dark:text-white font-bold text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">رقم التحويل / تفاصيل الحساب</label>
+                              <input
+                                type="text"
+                                value={newPaymentMethodDetails}
+                                onChange={(e) => setNewPaymentMethodDetails(e.target.value)}
+                                placeholder="مثال: 0780000000"
+                                className="w-full bg-gray-50 dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 outline-none focus:border-emerald-500 dark:text-white font-bold text-xs text-right"
+                                dir="ltr"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!newPaymentMethodName.trim() || !newPaymentMethodDetails.trim()) {
+                                  toast.error("يرجى إدخال اسم وتفاصيل طريقة الدفع");
+                                  return;
+                                }
+                                const newMethod = {
+                                  id: Date.now().toString(),
+                                  name: newPaymentMethodName,
+                                  details: newPaymentMethodDetails,
+                                  isEnabled: true
+                                };
+                                setTempPaymentMethods([...tempPaymentMethods, newMethod]);
+                                setNewPaymentMethodName('');
+                                setNewPaymentMethodDetails('');
+                                setIsAddingPaymentMethod(false);
+                              }}
+                              className="bg-emerald-500 text-white font-black text-[10px] py-2 px-6 rounded-lg hover:bg-emerald-600 transition-all"
+                            >
+                              إضافة
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {tempPaymentMethods.map((method, idx) => (
+                          <div key={method.id || idx} className="bg-white dark:bg-[#12121A] border border-gray-150 dark:border-[#2D2D3D] p-3 rounded-xl flex flex-col gap-2 relative group">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-black text-gray-800 dark:text-gray-200">{method.name}</span>
+                              <div className="flex items-center gap-1">
+                                <label className="flex items-center cursor-pointer relative" title={method.isEnabled ? "طريقة مفعلة (تظهر للطلاب)" : "طريقة معطلة (مخفية عن الطلاب)"}>
+                                  <input
+                                    type="checkbox"
+                                    checked={method.isEnabled}
+                                    onChange={(e) => {
+                                      const updated = [...tempPaymentMethods];
+                                      updated[idx].isEnabled = e.target.checked;
+                                      setTempPaymentMethods(updated);
+                                    }}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => setTempPaymentMethods(tempPaymentMethods.filter((_, i) => i !== idx))}
+                                  className="text-red-400 hover:text-red-600 p-1"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-gray-500 font-mono" dir="ltr">{method.details}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  </div>
                   </div>
                   <div className="space-y-3 md:col-span-2 border-t border-gray-100 dark:border-[#2D2D3D] pt-4">
                     <h4 className="text-xs font-black text-emerald-500">معلومات التواصل (فوتر المنصة)</h4>

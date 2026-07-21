@@ -14,6 +14,7 @@ import ExamPage from './components/ExamPage';
 import PageTransition from './components/PageTransition';
 import { PlatformSettingsProvider } from './context/PlatformSettingsContext';
 import { Toaster } from 'react-hot-toast';
+import InstallPromptBanner from './components/InstallPromptBanner';
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -39,6 +40,7 @@ export default function App() {
     <PlatformSettingsProvider>
       <Router>
         <AnimatedRoutes />
+        <InstallPromptBanner />
         <Toaster position="top-center" reverseOrder={false} toastOptions={{ duration: 3000 }} />
       </Router>
     </PlatformSettingsProvider>

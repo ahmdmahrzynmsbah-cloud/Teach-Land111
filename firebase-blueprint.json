@@ -195,6 +195,25 @@
         "timestamp": { "type": "string" }
       },
       "required": ["videoUrl", "type", "userEmail", "userId", "timestamp"]
+    },
+    "WalletChargeRequest": {
+      "title": "Wallet Charge Request",
+      "description": "Student request to recharge wallet balance with a bank receipt.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "studentEmail": { "type": "string", "maxLength": 100 },
+        "studentPhone": { "type": "string" },
+        "amount": { "type": "number" },
+        "receiptUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "adminNotes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" }
+      },
+      "required": ["studentId", "studentName", "amount", "receiptUrl", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -237,6 +256,10 @@
     "secret_links_log/{logId}": {
       "schema": { "$ref": "SecretLinksLog" },
       "description": "Hidden logs of added/edited lesson/review video links."
+    },
+    "wallet_charge_requests/{requestId}": {
+      "schema": { "$ref": "WalletChargeRequest" },
+      "description": "Student bank transfer charging requests."
     }
   }
 }

@@ -100,6 +100,7 @@ export default function CourseDetails() {
   const [isInstapayEnabled, setIsInstapayEnabled] = useState(true);
   const [bankAccountDetails, setBankAccountDetails] = useState('');
   const [isBankAccountEnabled, setIsBankAccountEnabled] = useState(true);
+  const [customPaymentMethods, setCustomPaymentMethods] = useState<any[]>([]);
   const [copiedNumber, setCopiedNumber] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'vodafone' | 'wallet'>('wallet');
   const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
@@ -342,6 +343,9 @@ export default function CourseDetails() {
                   setBankAccountDetails(settingsData.bankAccountDetails);
                 }
                 setIsBankAccountEnabled(settingsData.isBankAccountEnabled !== false);
+                if (settingsData.customPaymentMethods) {
+                  setCustomPaymentMethods(settingsData.customPaymentMethods);
+                }
               }
             } catch (err) {
               console.error("Error fetching platform settings inside course:", err);
@@ -1054,6 +1058,28 @@ export default function CourseDetails() {
         handleFirestoreError(error, OperationType.WRITE, `course_progress/${userData.id}_${course.id}`);
       }
 
+      // 2.5. Create course payment record for teacher revenue
+      try {
+        await addDoc(collection(db, "course_payments"), {
+          userId: userData.id,
+          userName: userData.name,
+          userPhone: userData.phone || '',
+          courseId: course.id,
+          courseTitle: course.title,
+          coursePrice: course.price || 0,
+          senderName: 'الدفع بالمحفظة',
+          senderPhone: userData.phone || '',
+          screenshotUrl: '',
+          status: 'approved',
+          paymentMethod: 'wallet',
+          teacherId: course.teacherId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, "course_payments");
+      }
+
       // 3. Create transaction record
       try {
         await addDoc(collection(db, "wallet_transactions"), {
@@ -1175,6 +1201,7 @@ export default function CourseDetails() {
         senderPhone: paymentSenderPhone.trim(),
         screenshotUrl: base64Screenshot,
         status: 'pending',
+        teacherId: course.teacherId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -2810,7 +2837,7 @@ export default function CourseDetails() {
                     رصيد المحفظة
                   </button>
                   
-                  {(isVodafoneCashEnabled || isInstapayEnabled || isBankAccountEnabled) && (
+                  {(isVodafoneCashEnabled || isInstapayEnabled || isBankAccountEnabled || customPaymentMethods.some(m => m.isEnabled)) && (
                     <button
                       onClick={() => setPaymentMethod('vodafone')}
                       className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all ${

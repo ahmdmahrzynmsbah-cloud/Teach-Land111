@@ -88,42 +88,59 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
 
         {/* Modal Panel */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ type: 'spring', duration: 0.5 }}
-          className="relative w-full max-w-lg bg-white dark:bg-[#12121A] rounded-[2rem] border border-gray-150 dark:border-[#2D2D3D] shadow-2xl overflow-hidden z-10"
+          initial={{ opacity: 0, scale: 0.9, y: 40, rotateX: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 40, rotateX: 10 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 140 }}
+          className="relative w-full max-w-lg bg-white/95 dark:bg-[#0F0F16]/98 backdrop-blur-2xl rounded-[2.5rem] p-0.5 overflow-hidden z-10 shadow-[0_25px_60px_rgba(0,0,0,0.4)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-transparent"
           dir="rtl"
           id="install-app-modal-panel"
         >
-          {/* Header Glow */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-gradient-to-b from-[#00B4D8]/10 to-transparent dark:from-[#D4AF37]/10 rounded-full blur-2xl pointer-events-none" />
+          {/* Outer Gold/Cyan Neon Border Stroke */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#00B4D8]/30 via-transparent to-[#0077B6]/30 dark:from-[#D4AF37]/30 dark:via-transparent dark:to-[#B8860B]/30 pointer-events-none rounded-[2.5rem]" />
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-5 left-5 w-9 h-9 rounded-full bg-gray-50 dark:bg-[#1A1A24] text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center justify-center transition-all border border-gray-100 dark:border-[#222230] hover:scale-105"
-            id="install-modal-close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="relative bg-white dark:bg-[#0F0F16] rounded-[2.4rem] p-6 sm:p-9 space-y-6 overflow-hidden">
+            {/* Header Ambient Radial Light Glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-gradient-to-b from-[#00B4D8]/15 to-transparent dark:from-[#D4AF37]/15 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Content Body */}
-          <div className="p-6 sm:p-8 space-y-6 pt-10">
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              className="absolute top-6 left-6 w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 dark:bg-[#151522] dark:hover:bg-[#1C1C2D] text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center justify-center transition-all border border-gray-100 dark:border-white/5 hover:scale-110 active:scale-95 cursor-pointer"
+              id="install-modal-close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
             {/* Platform Branding */}
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-[#00B4D8]/20 dark:shadow-[#D4AF37]/20 border border-white/10 select-none">
+            <div className="flex flex-col items-center text-center space-y-4 pt-4">
+              <motion.div 
+                animate={{ 
+                  scale: [1, 1.04, 1],
+                  rotate: [0, 1, -1, 0]
+                }}
+                transition={{ 
+                  duration: 6, 
+                  repeat: Infinity, 
+                  ease: "easeInOut" 
+                }}
+                className="w-18 h-18 rounded-[1.5rem] bg-gradient-to-tr from-[#0077B6] via-[#00B4D8] to-[#00E5FF] dark:from-[#B8860B] dark:via-[#D4AF37] dark:to-[#FFEAA7] flex items-center justify-center text-white font-black text-3xl shadow-2xl shadow-[#00B4D8]/30 dark:shadow-[#D4AF37]/30 border border-white/20 select-none"
+              >
                 {settings.logoChar || 'T'}
-              </div>
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#00B4D8]/10 text-[#0077B6] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37]">
-                  <Sparkles className="w-3 h-3" /> متاح الآن مجاناً
+              </motion.div>
+              
+              <div className="space-y-1.5 max-w-sm">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-[#00B4D8]/10 text-[#0077B6] dark:bg-[#D4AF37]/10 dark:text-[#D4AF37] border border-[#00B4D8]/20 dark:border-[#D4AF37]/20 shadow-sm">
+                  <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} /> 
+                  نسخة الويب الرسمية الفخمة
                 </span>
-                <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
-                  تثبيت تطبيق منصة {settings.platformName || 'Teachland'}
+                
+                <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                  تثبيت تطبيق {settings.platformName || 'Teachland'}
                 </h3>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">
-                  احصل على وصول فوري ومباشر لدروسك ومراجعاتك من الشاشة الرئيسية بدون إعلانات أو قيود!
+                
+                <p className="text-xs sm:text-xs text-gray-500 dark:text-gray-400 font-bold leading-relaxed">
+                  قم بتنزيل المنصة الآن لتجربة تصفح غامرة، تحميل فوري للمواد، مراجعات خالية من القيود وتصفح مستقل كامل!
                 </p>
               </div>
             </div>
@@ -276,27 +293,30 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
                           <p className="text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-400">
                             جهاز الكمبيوتر الخاص بك يدعم تثبيت منصة {settings.platformName} كتطبيق مستقل لسطح المكتب!
                           </p>
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={triggerNativeInstall}
-                            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#00B4D8] to-[#0077B6] dark:from-[#D4AF37] dark:to-[#B8860B] text-white font-black text-sm px-6 py-3.5 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#00B4D8] via-[#0077B6] to-[#00B4D8] text-white font-black text-sm px-6 py-4 rounded-2xl shadow-xl shadow-[#00B4D8]/20 transition-all cursor-pointer border border-white/10"
                             id="btn-trigger-desktop-install"
                           >
-                            <Download className="w-4 h-4" />
-                            <span>تثبيت لسطح المكتب الآن 💻</span>
-                          </button>
+                            <Download className="w-5 h-5 animate-bounce" />
+                            <span>تثبيت لسطح المكتب بضغطة واحدة 💻</span>
+                          </motion.button>
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <p className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 leading-relaxed">
-                            لتنزيل المنصة على حاسوبك الشخصي:
+                          <p className="text-xs sm:text-sm font-black text-gray-700 dark:text-gray-300 leading-relaxed">
+                            لتنزيل المنصة على حاسوبك الشخصي كبرنامج مستقل:
                           </p>
-                          <div className="p-4 bg-gray-50 dark:bg-[#0D0D12] border border-gray-150 dark:border-[#20202C] rounded-2xl space-y-2.5">
-                            <div className="flex items-center gap-2 text-xs font-bold text-gray-600 dark:text-gray-400">
-                              <Chrome className="w-4 h-4 text-blue-500" />
-                              <span>من خلال متصفح Chrome أو Edge:</span>
+                          <div className="p-5 bg-gray-50/50 dark:bg-[#12121E]/60 border border-gray-150 dark:border-[#2D2D3F]/80 rounded-[1.5rem] space-y-3 relative overflow-hidden backdrop-blur-md">
+                            <div className="absolute top-0 right-0 w-16 h-16 bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 rounded-full blur-xl pointer-events-none" />
+                            <div className="flex items-center gap-2 text-xs font-black text-gray-700 dark:text-gray-300">
+                              <Chrome className="w-4 h-4 text-[#00B4D8] dark:text-[#D4AF37]" />
+                              <span>من خلال شريط العنوان بالأعلى في متصفحك:</span>
                             </div>
-                            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 leading-relaxed">
-                              اضغط على أيقونة التنزيل <span className="font-mono font-black text-[#00B4D8] dark:text-[#D4AF37]">⊕</span> أو <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">Install App</span> في شريط العنوان بالأعلى لتثبيت التطبيق بضغطة واحدة.
+                            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed">
+                              اضغط على أيقونة التثبيت <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-white font-mono font-black mx-1">⊕</span> أو زر <span className="font-mono bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-800 dark:text-white">Install App</span> في شريط العنوان بالأعلى لتثبيت التطبيق على جهازك فوراً.
                             </p>
                           </div>
                         </div>
@@ -305,46 +325,48 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
                   )}
                 </div>
 
-                {/* Benefits List */}
-                <div className="pt-2 border-t border-gray-100 dark:border-[#20202C] space-y-2.5">
-                  <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider">مميزات تطبيق الموبايل والكمبيوتر:</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-300">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5" />
+                {/* Benefits List (Bento-style Grid) */}
+                <div className="pt-4 border-t border-gray-100 dark:border-[#20202C] space-y-3">
+                  <h4 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">مميزات تطبيق الموبايل والكمبيوتر المعتمد:</h4>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-3 bg-gray-50/40 dark:bg-[#131320]/40 rounded-2xl border border-gray-100/50 dark:border-[#202030]/50 flex items-center gap-2.5 hover:bg-gray-50 dark:hover:bg-[#151525] transition-all">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <Check className="w-4 h-4 stroke-[3]" />
                       </div>
-                      <span>تصفح بدون شريط عنوان</span>
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">بدون شريط عنوان</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-300">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5" />
+                    <div className="p-3 bg-gray-50/40 dark:bg-[#131320]/40 rounded-2xl border border-gray-100/50 dark:border-[#202030]/50 flex items-center gap-2.5 hover:bg-gray-50 dark:hover:bg-[#151525] transition-all">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <Check className="w-4 h-4 stroke-[3]" />
                       </div>
-                      <span>تحميل فوري وتلقائي</span>
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">تحميل فوري وتلقائي</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-300">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5" />
+                    <div className="p-3 bg-gray-50/40 dark:bg-[#131320]/40 rounded-2xl border border-gray-100/50 dark:border-[#202030]/50 flex items-center gap-2.5 hover:bg-gray-50 dark:hover:bg-[#151525] transition-all">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <Check className="w-4 h-4 stroke-[3]" />
                       </div>
-                      <span>إشعارات الحصص والدروس</span>
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">إشعارات تفاعلية للبث</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-300">
-                      <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5" />
+                    <div className="p-3 bg-gray-50/40 dark:bg-[#131320]/40 rounded-2xl border border-gray-100/50 dark:border-[#202030]/50 flex items-center gap-2.5 hover:bg-gray-50 dark:hover:bg-[#151525] transition-all">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <Check className="w-4 h-4 stroke-[3]" />
                       </div>
-                      <span>تأمين وحماية كاملة للبث</span>
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">حماية كاملة للبث</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Bottom CTA Button */}
                 <div className="pt-2">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={onClose}
-                    className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-[#1C1C28] dark:hover:bg-[#252538] text-gray-700 dark:text-gray-200 text-xs font-black transition-all cursor-pointer text-center"
+                    className="w-full py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-[#171725] dark:hover:bg-[#202032] text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white text-xs font-black border border-gray-150 dark:border-[#252538] transition-all cursor-pointer text-center"
                     id="btn-close-and-browse"
                   >
                     حسناً، تصفح المنصة الآن
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             )}

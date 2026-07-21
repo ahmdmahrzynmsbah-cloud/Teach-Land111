@@ -247,7 +247,8 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
 
   // Get total course subscribers
   const getCourseSubscribersCount = (courseId: string) => {
-    return payments.filter(p => p.courseId === courseId).length;
+    const c = courses.find(course => course.id === courseId);
+    return c?.enrolledStudents || 0;
   };
 
   // --- ADMIN VIEW SPECIFIC CALCULATIONS ---

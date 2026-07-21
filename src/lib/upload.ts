@@ -267,9 +267,9 @@ export async function uploadChunkedFile(
         const chunk = file.slice(start, end);
 
         const formData = new FormData();
-        formData.append('chunk', chunk);
         formData.append('chunkIndex', i.toString());
         formData.append('fileId', fileId);
+        formData.append('chunk', chunk);
 
         const response = await fetch('/api/upload-chunk', {
           method: 'POST',
@@ -277,7 +277,8 @@ export async function uploadChunkedFile(
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to upload chunk ${i}`);
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to upload chunk ${i}`);
         }
 
         // Calculate overall progress based on chunks + some space for merge/bunny upload

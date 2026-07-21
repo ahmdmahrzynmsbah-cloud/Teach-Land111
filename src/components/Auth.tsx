@@ -17,6 +17,31 @@ const EGYPT_GOVERNORATES = [
   'شمال سيناء', 'جنوب سيناء'
 ];
 
+const COUNTRY_CODES = [
+  { code: '+20', flag: '🇪🇬', name: 'مصر' },
+  { code: '+966', flag: '🇸🇦', name: 'السعودية' },
+  { code: '+971', flag: '🇦🇪', name: 'الإمارات' },
+  { code: '+965', flag: '🇰🇼', name: 'الكويت' },
+  { code: '+974', flag: '🇶🇦', name: 'قطر' },
+  { code: '+973', flag: '🇧🇭', name: 'البحرين' },
+  { code: '+968', flag: '🇴🇲', name: 'عمان' },
+  { code: '+962', flag: '🇯🇴', name: 'الأردن' },
+  { code: '+964', flag: '🇮🇶', name: 'العراق' },
+  { code: '+963', flag: '🇸🇾', name: 'سوريا' },
+  { code: '+961', flag: '🇱🇧', name: 'لبنان' },
+  { code: '+970', flag: '🇵🇸', name: 'فلسطين' },
+  { code: '+967', flag: '🇾🇪', name: 'اليمن' },
+  { code: '+249', flag: '🇸🇩', name: 'السودان' },
+  { code: '+218', flag: '🇱🇾', name: 'ليبيا' },
+  { code: '+216', flag: '🇹🇳', name: 'تونس' },
+  { code: '+213', flag: '🇩🇿', name: 'الجزائر' },
+  { code: '+212', flag: '🇲🇦', name: 'المغرب' },
+  { code: '+222', flag: '🇲🇷', name: 'موريتانيا' },
+  { code: '+252', flag: '🇸🇴', name: 'الصومال' },
+  { code: '+253', flag: '🇩🇯', name: 'جيبوتي' },
+  { code: '+269', flag: '🇰🇲', name: 'جزر القمر' }
+];
+
 export default function Auth() {
   const { settings } = usePlatformSettings();
   const location = useLocation();
@@ -39,6 +64,7 @@ export default function Auth() {
     setAdminCode('');
   }, [location.pathname]);
 
+  // Prevent auto-redirect during form submission to avoid race conditions
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && !loading) {
@@ -62,6 +88,13 @@ export default function Auth() {
     const formData = new FormData(e.currentTarget);
     let email = (formData.get('email') as string || '').trim().toLowerCase();
     const password = (formData.get('password') as string || '').trim();
+
+    const combinePhone = (name: string) => {
+      const code = formData.get(`${name}Code`) as string;
+      const num = formData.get(name) as string;
+      if (!num) return '';
+      return `${code || ''}${num}`.trim();
+    };
 
     // If login input is a phone number, convert to the special registration email format
     if (/^[0-9]+$/.test(email) && email.startsWith('01') && email.length === 11) {
@@ -141,28 +174,26 @@ export default function Auth() {
               throw new Error(`هذا الحساب مسجل كـ (${roleNameAr}) وليس كـ (${selectedRoleNameAr}). يرجى تسجيل الدخول من التبويب الصحيح.`);
             }
           } else {
-            // User authenticated but no Firestore doc exists at all - auto-create a default doc instead of signing them out!
-            const defaultName = userCredential.user.displayName || (email ? email.split('@')[0] : 'مستخدم جديد');
-            const defaultRole = email.includes('admin') ? 'admin' : (email.includes('teacher') ? 'teacher' : 'student');
-            const defaultDoc = {
-              id: userCredential.user.uid,
-              email: email,
-              name: defaultName,
-              phone: '01000000000',
-              governorate: 'القاهرة',
-              role: defaultRole,
-              createdAt: new Date().toISOString(),
-              isApproved: true,
-              stars: 0,
-              points: 0,
-              ...(defaultRole === 'student' ? {
-                grade: 'الأول الثانوي',
-                school: 'المدرسة الثانوية',
-                parentPhone: '01100000000'
-              } : {})
-            };
-            await setDoc(doc(db, 'users', userCredential.user.uid), defaultDoc);
-            setRole(defaultRole as any);
+            if (role === 'admin' || email.includes('admin')) {
+              const defaultName = userCredential.user.displayName || (email ? email.split('@')[0] : 'مستخدم جديد');
+              const defaultDoc = {
+                id: userCredential.user.uid,
+                email: email,
+                name: defaultName,
+                phone: '01000000000',
+                governorate: 'القاهرة',
+                role: 'admin',
+                createdAt: new Date().toISOString(),
+                isApproved: true,
+                stars: 0,
+                points: 0
+              };
+              await setDoc(doc(db, 'users', userCredential.user.uid), defaultDoc);
+              setRole('admin');
+            } else {
+              await auth.signOut();
+              throw new Error('تم مسح بيانات هذا الحساب من النظام بواسطة الإدارة. يرجى إعادة إنشاء الحساب (من تبويب إنشاء حساب) باستخدام نفس كلمة المرور القديمة لاستعادة حسابك.');
+            }
           }
         }
 
@@ -174,7 +205,7 @@ export default function Auth() {
         const baseData = {
           email,
           name: formData.get('name') as string,
-          phone: formData.get('phone') as string,
+          phone: combinePhone('phone'),
           governorate: formData.get('governorate') as string,
           role,
           password,
@@ -186,7 +217,7 @@ export default function Auth() {
             ...baseData,
             grade: formData.get('grade') as string,
             school: formData.get('school') as string,
-            parentPhone: formData.get('parentPhone') as string,
+            parentPhone: combinePhone('parentPhone'),
             educationSystem: formData.get('educationSystem') as string,
             branch: formData.get('branch') as string || null,
             isApproved: false
@@ -240,7 +271,7 @@ export default function Auth() {
         } else if (role === 'parent') {
           await setDoc(doc(db, 'users', user.uid), {
             ...baseData,
-            studentPhone: formData.get('studentPhone') as string,
+            studentPhone: combinePhone('studentPhone'),
             isApproved: false
           });
         } else if (role === 'admin') {
@@ -255,7 +286,74 @@ export default function Auth() {
       if (err.code === 'auth/operation-not-allowed') {
         setError('عذراً، لم يتم تفعيل الدخول بالبريد الإلكتروني في قاعدة البيانات. (يجب تفعيل Email/Password من لوحة تحكم Firebase)');
       } else if (err.code === 'auth/email-already-in-use' || (err.message && err.message.includes('email-already-in-use'))) {
-        setError('هذا البريد الإلكتروني أو رقم الهاتف مسجل بالفعل في المنصة، يرجى تسجيل الدخول مباشرة.');
+        if (!isLogin) {
+          try {
+            // Check if this is a zombie account (Auth exists but Firestore doc is missing)
+            const loginAttempt = await signInWithEmailAndPassword(auth, email, password);
+            const docCheck = await getDoc(doc(db, 'users', loginAttempt.user.uid));
+            if (!docCheck.exists()) {
+              // Recreate the document!
+              const baseData = {
+                email,
+                name: formData.get('name') as string,
+                phone: combinePhone('phone'),
+                governorate: formData.get('governorate') as string,
+                role,
+                password,
+                createdAt: new Date().toISOString()
+              };
+              
+              if (role === 'student') {
+                await setDoc(doc(db, 'users', loginAttempt.user.uid), {
+                  ...baseData,
+                  grade: formData.get('grade') as string,
+                  school: formData.get('school') as string,
+                  parentPhone: combinePhone('parentPhone'),
+                  educationSystem: formData.get('educationSystem') as string,
+                  branch: (formData.get('branch') as string) || null,
+                  isApproved: false
+                });
+              } else if (role === 'teacher') {
+                const grades = [];
+                if (formData.get('grade_1')) grades.push('الأول الإعدادي');
+                if (formData.get('grade_2')) grades.push('الثاني الإعدادي');
+                if (formData.get('grade_3')) grades.push('الثالث الإعدادي');
+                if (formData.get('grade_4')) grades.push('الأول الثانوي');
+                if (formData.get('grade_5')) grades.push('الثاني الثانوي');
+                if (formData.get('grade_6')) grades.push('الثالث الثانوي');
+                const finalGrades = grades.length > 0 ? grades : ['غير محدد'];
+                
+                await setDoc(doc(db, 'users', loginAttempt.user.uid), {
+                  ...baseData,
+                  subject: formData.get('subject') as string,
+                  nationalId: formData.get('nationalId') as string,
+                  dateOfBirth: formData.get('dateOfBirth') as string,
+                  teachingGrades: finalGrades,
+                  isApproved: false
+                });
+              } else if (role === 'parent') {
+                await setDoc(doc(db, 'users', loginAttempt.user.uid), {
+                  ...baseData,
+                  studentPhone: combinePhone('studentPhone'),
+                  isApproved: false
+                });
+              } else if (role === 'admin') {
+                await setDoc(doc(db, 'users', loginAttempt.user.uid), {
+                  ...baseData,
+                  isApproved: true
+                });
+              }
+              navigate('/dashboard');
+              return;
+            } else {
+              setError('هذا البريد الإلكتروني أو رقم الهاتف مسجل بالفعل في المنصة، يرجى تسجيل الدخول مباشرة.');
+            }
+          } catch (e) {
+            setError('هذا البريد الإلكتروني مسجل مسبقاً. إذا كان حسابك محذوفاً يرجى التواصل مع الإدارة، أو حاول تسجيل الدخول بكلمة المرور القديمة.');
+          }
+        } else {
+          setError('هذا البريد الإلكتروني أو رقم الهاتف مسجل بالفعل في المنصة، يرجى تسجيل الدخول مباشرة.');
+        }
       } else if (err.code === 'auth/weak-password') {
         setError('كلمة المرور ضعيفة، يجب أن تكون 6 أحرف على الأقل.');
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
@@ -501,7 +599,7 @@ export default function Auth() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             <AnimatePresence mode="popLayout">
               {!isLogin && (
                 <motion.div 
@@ -627,9 +725,17 @@ export default function Auth() {
                     ) : role === 'parent' ? (
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block">رقم هاتف الطالب المرتبط</label>
-                        <div className="relative">
-                          <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
-                          <input name="studentPhone" required type="tel" pattern="^01[0125][0-9]{8}$" title="رقم هاتف مصري صحيح (مثال: 01012345678)" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" placeholder="01X..." dir="ltr" />
+                        <div className="flex gap-2" dir="ltr">
+                          <select name="studentPhoneCode" defaultValue="+20" className="bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-2 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] transition-colors text-sm font-bold w-[110px]" dir="ltr">
+                            {COUNTRY_CODES.map(c => (
+                              <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                            ))}
+                          </select>
+                          <div className="relative flex-1">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            <input name="studentPhone" required type="tel" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-11 pr-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold text-left" placeholder="01X..." />
+                          </div>
+                          
                         </div>
                       </div>
                     ) : null}
@@ -646,9 +752,17 @@ export default function Auth() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block">رقم ولي الأمر</label>
-                        <div className="relative">
-                          <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
-                          <input name="parentPhone" required type="tel" pattern="^01[0125][0-9]{8}$" title="رقم هاتف مصري صحيح (مثال: 01012345678)" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" placeholder="01X..." dir="ltr" />
+                        <div className="flex gap-2" dir="ltr">
+                          <select name="parentPhoneCode" defaultValue="+20" className="bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-2 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] transition-colors text-sm font-bold w-[110px]" dir="ltr">
+                            {COUNTRY_CODES.map(c => (
+                              <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                            ))}
+                          </select>
+                          <div className="relative flex-1">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            <input name="parentPhone" required type="tel" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-11 pr-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold text-left" placeholder="01X..." />
+                          </div>
+                          
                         </div>
                       </div>
                     </div>
@@ -685,10 +799,18 @@ export default function Auth() {
                   ) : null}
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block">رقم الهاتف</label>
-                    <div className="relative">
-                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
-                      <input name="phone" required type="tel" pattern="^01[0125][0-9]{8}$" title="رقم هاتف مصري صحيح (مثال: 01012345678)" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" placeholder="01X..." dir="ltr" />
-                    </div>
+                    <div className="flex gap-2" dir="ltr">
+                          <select name="phoneCode" defaultValue="+20" className="bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-2 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] transition-colors text-sm font-bold w-[110px]" dir="ltr">
+                            {COUNTRY_CODES.map(c => (
+                              <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                            ))}
+                          </select>
+                          <div className="relative flex-1">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            <input name="phone" required type="tel" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-11 pr-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold text-left" placeholder="01X..." />
+                          </div>
+                          
+                        </div>
                   </div>
                 </motion.div>
               )}
@@ -702,6 +824,7 @@ export default function Auth() {
                 <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
                 <input 
                   name="email" 
+                  autoComplete="off"
                   required 
                   type={isLogin ? "text" : "email"} 
                   className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" 
@@ -715,7 +838,7 @@ export default function Auth() {
               <label className="text-xs font-bold text-gray-700 dark:text-gray-200 block">كلمة المرور</label>
               <div className="relative">
                 <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400" />
-                <input name="password" required minLength={4} type="password" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" placeholder="••••••••" dir="ltr" />
+                <input name="password" autoComplete="new-password" required minLength={4} type="password" className="w-full bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-xl pl-4 pr-11 sm:pr-12 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:border-[#D4AF37] focus:bg-white dark:focus:bg-[#0D0D12] transition-colors text-sm font-bold" placeholder="••••••••" dir="ltr" />
               </div>
             </div>
 

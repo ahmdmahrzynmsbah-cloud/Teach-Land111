@@ -24,6 +24,7 @@ export const defaultSettings: PlatformSettings = {
   isInstapayEnabled: true,
   bankAccountDetails: '',
   isBankAccountEnabled: true,
+  customPaymentMethods: [],
   subjects: [
     { id: 'math', title: 'الرياضيات', iconName: 'Calculator', color: 'bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' },
     { id: 'physics', title: 'الفيزياء', iconName: 'Zap', color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-500/10 dark:text-yellow-400' },

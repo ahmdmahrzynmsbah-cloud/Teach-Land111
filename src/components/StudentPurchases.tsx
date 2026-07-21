@@ -210,7 +210,7 @@ export default function StudentPurchases({ userData }: { userData: any }) {
             </p>
           </div>
         ) : (
-          <div className="mt-8 space-y-4">
+          <div className="mt-6 space-y-3">
             {orders.map(order => {
               const item = itemsMap[order.itemId];
               const formattedDate = new Date(order.date).toLocaleDateString('ar-EG', {
@@ -218,55 +218,58 @@ export default function StudentPurchases({ userData }: { userData: any }) {
               });
               
               return (
-                <div key={order.id} className="bg-white dark:bg-[#12121A] border border-gray-150 dark:border-[#2D2D3D] rounded-2xl p-4 sm:p-5 hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-5 relative overflow-hidden group">
+                <div key={order.id} className="bg-white dark:bg-[#12121A] border border-gray-150 dark:border-[#2D2D3D]/50 rounded-2xl p-3.5 hover:bg-gray-50/50 dark:hover:bg-[#15151F]/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative pl-4 pr-5 overflow-hidden group">
                   
                   {/* Status Indicator */}
                   <div className="absolute top-0 right-0 w-1.5 h-full bg-emerald-500 dark:bg-emerald-600"></div>
                   
-                  {/* Item Image */}
-                  <div className="w-full sm:w-32 h-40 sm:h-32 bg-gray-100 dark:bg-[#1A1A24] rounded-xl overflow-hidden shrink-0 flex items-center justify-center relative">
-                    {item?.imageUrl ? (
-                      <img src={item.imageUrl} alt={order.itemTitle} className="w-full h-full object-cover" />
-                    ) : (
-                      <ShoppingBag className="w-8 h-8 text-gray-300 dark:text-gray-600" />
-                    )}
+                  {/* Item Image & Title & Date */}
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div className="w-12 h-12 bg-gray-100 dark:bg-[#1A1A24] rounded-xl overflow-hidden shrink-0 flex items-center justify-center relative border border-gray-100 dark:border-[#2D2D3D]">
+                      {item?.imageUrl ? (
+                        <img src={item.imageUrl} alt={order.itemTitle} className="w-full h-full object-cover" />
+                      ) : (
+                        <ShoppingBag className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                      )}
+                    </div>
+                    
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-black text-gray-900 dark:text-white truncate mb-1">{order.itemTitle}</h3>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 dark:text-gray-500">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{formattedDate}</span>
+                      </div>
+                    </div>
                   </div>
                   
-                  {/* Details */}
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-                      <div>
-                        <h3 className="text-lg font-black text-gray-900 dark:text-white mb-1.5">{order.itemTitle}</h3>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-gray-50 dark:bg-[#1A1A24] px-2.5 py-1 rounded-lg border border-gray-100 dark:border-[#2D2D3D]">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {formattedDate}
-                          </span>
-                          <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-lg">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            مكتمل
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right sm:text-left shrink-0">
-                        <span className="block text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wider">المبلغ المدفوع</span>
-                        <div className="flex items-center sm:justify-end gap-1.5 text-xl font-black text-[#00B4D8] dark:text-[#D4AF37]">
-                          {order.amount} 
-                          <span className="text-sm">ج.م</span>
-                        </div>
+                  {/* Left Side Controls: Price, Status, Print Button */}
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 sm:gap-6 justify-between sm:justify-end">
+                    
+                    {/* Amount */}
+                    <div className="text-right sm:text-left">
+                      <span className="block text-[10px] text-gray-400 font-bold mb-0.5 uppercase tracking-wider">المبلغ المدفوع</span>
+                      <div className="flex items-center sm:justify-end gap-1 text-base font-black text-[#00B4D8] dark:text-[#D4AF37] font-mono">
+                        {order.amount} 
+                        <span className="text-xs font-black">ج.م</span>
                       </div>
                     </div>
                     
-                    <div className="mt-auto flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 dark:border-[#2D2D3D]">
-                      <button
-                        onClick={() => handlePrintInvoice(order)}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-gray-50 hover:bg-gray-100 dark:bg-[#1A1A24] dark:hover:bg-[#2D2D3D] text-gray-700 dark:text-gray-300 rounded-xl text-sm font-black flex items-center justify-center gap-2 border border-gray-200 dark:border-[#2D2D3D] transition-colors"
-                      >
-                        <Printer className="w-4 h-4" />
-                        عرض وطباعة الفاتورة
-                      </button>
+                    {/* Status Badge */}
+                    <div className="shrink-0">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/10 px-2.5 py-1 rounded-full">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        مكتمل
+                      </span>
                     </div>
+
+                    {/* Print Button */}
+                    <button
+                      onClick={() => handlePrintInvoice(order)}
+                      className="w-full sm:w-auto px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-[#1A1A24] dark:hover:bg-[#2D2D3D] text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 border border-gray-200 dark:border-[#2D2D3D] transition-colors cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      عرض وطباعة الفاتورة
+                    </button>
                   </div>
                 </div>
               );

@@ -316,20 +316,35 @@ async function startServer() {
 
   // API Route for chunked upload
   app.post('/api/upload-chunk', upload.single('chunk'), (req, res) => {
-    const { fileId, chunkIndex } = req.body;
-    const chunkFile = req.file;
-    if (!chunkFile || !fileId) {
-      res.status(400).json({ error: 'Missing chunk or fileId' });
-      return;
-    }
+    try {
+      const { fileId, chunkIndex } = req.body;
+      const chunkFile = req.file;
+      if (!chunkFile || !fileId) {
+        console.error('Upload chunk missing file or fileId:', { hasFile: !!chunkFile, fileId });
+        res.status(400).json({ error: 'Missing chunk or fileId' });
+        return;
+      }
 
-    const chunkDir = path.join(uploadDir, 'chunks', fileId);
-    if (!fs.existsSync(chunkDir)) {
-      fs.mkdirSync(chunkDir, { recursive: true });
-    }
+      const chunkDir = path.join(uploadDir, 'chunks', fileId);
+      if (!fs.existsSync(chunkDir)) {
+        fs.mkdirSync(chunkDir, { recursive: true });
+      }
 
-    fs.renameSync(chunkFile.path, path.join(chunkDir, chunkIndex.toString()));
-    res.json({ success: true });
+      const destPath = path.join(chunkDir, chunkIndex.toString());
+      try {
+        fs.renameSync(chunkFile.path, destPath);
+      } catch (renameError: any) {
+        // Fallback for cross-device or permission issues in container filesystems
+        console.warn('renameSync failed, trying copy + unlink instead:', renameError.message);
+        fs.copyFileSync(chunkFile.path, destPath);
+        fs.unlinkSync(chunkFile.path);
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error in /api/upload-chunk:', error);
+      res.status(500).json({ error: error.message || 'Failed to upload chunk' });
+    }
   });
 
   app.post('/api/upload-merge', express.json(), (req, res) => {

@@ -70,7 +70,8 @@ export default function SpecialRegistration() {
         role: 'student',
         registrationType: selectedRegType,
         isSpecialRegistration: true,
-        status: 'pending',
+        status: 'approved',
+        isApproved: true,
         balance: 0,
         createdAt: new Date().toISOString(),
         governorate: 'غير محدد',
@@ -79,7 +80,7 @@ export default function SpecialRegistration() {
         parentPhone: '01000000000'
       });
 
-      toast.success(`تم تسجيل طلبك كطالب ${typeName} بنجاح! في انتظار موافقة الإدارة 🎉`);
+      toast.success(`تم إنشاء حسابك كطالب ${typeName} بنجاح! يمكنك الآن بدء التعلم والاشتراك في الدورات مباشرة 🎉`);
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);

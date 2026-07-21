@@ -355,6 +355,8 @@ export default function ComprehensiveExamBuilder({
                   className="w-full p-3 bg-gray-50 dark:bg-[#222230] border border-gray-200 dark:border-[#2D2D3D] rounded-xl text-xs font-bold text-gray-900 dark:text-white focus:outline-none focus:border-[#00B4D8] dark:focus:border-[#D4AF37]"
                 >
                   <option value="">امتحان عام (متاح لجميع طلاب المنصة) 🌍</option>
+                  <option value="qudurat">امتحان مخصص - قدرات 🧠</option>
+                  <option value="tahsili">امتحان مخصص - تحصيلي 📚</option>
                   {coursesList.map((course) => (
                     <option key={course.id} value={course.id}>
                       {course.title}

@@ -36,6 +36,7 @@ import StudentStore from './StudentStore';
 import StudentPurchases from './StudentPurchases';
 import ParentInvoices from './ParentInvoices';
 import TeacherQuestionBank from './TeacherQuestionBank';
+import WalletRechargeRequestForm from './WalletRechargeRequestForm';
 
 const MOCK_TEACHER_STATS = [
   { id: 1, title: 'إجمالي الطلاب', value: '1,240', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
@@ -1250,7 +1251,6 @@ export default function Dashboard() {
         const docRef = doc(db, 'users', user.uid);
         const emailLower = user.email ? user.email.toLowerCase() : '';
         
-        // Safety timeout to prevent infinite loader if the document genuinely does not exist or fails to load
         timeoutId = setTimeout(() => {
           if (!userDataLoadedRef.current) {
             console.error("Timeout: User data could not be loaded from Firestore.");
@@ -1268,157 +1268,80 @@ export default function Dashboard() {
             userDataLoadedRef.current = true;
             setUserData({ id: docSnap.id, ...docSnap.data() });
             setLoading(false);
-          } else if (emailLower) {
-            // Fallback query by email if UID doc doesn't exist
-            const q = query(collection(db, 'users'), where('email', '==', emailLower));
-            getDocs(q).then(async (querySnap) => {
-              if (!querySnap.empty) {
-                const docSnapFallback = querySnap.docs[0];
-                const legacyData = docSnapFallback.data();
-                
-                // Migrate legacy user document to be identified by user.uid
-                try {
-                  await setDoc(doc(db, 'users', user.uid), {
-                    ...legacyData,
-                    id: user.uid
-                  });
-                  // Delete the legacy doc with random ID if it's different from user.uid
-                  if (docSnapFallback.id !== user.uid) {
-                    await deleteDoc(doc(db, 'users', docSnapFallback.id));
+          } else {
+             // document doesn't exist by UID. 
+             // Try fetching by email.
+             try {
+                if (emailLower) {
+                  const q = query(collection(db, 'users'), where('email', '==', emailLower));
+                  const querySnap = await getDocs(q);
+                  if (!querySnap.empty) {
+                    const docSnapFallback = querySnap.docs[0];
+                    const legacyData = docSnapFallback.data();
+                    try {
+                      await setDoc(doc(db, 'users', user.uid), {
+                        ...legacyData,
+                        id: user.uid
+                      });
+                      if (docSnapFallback.id !== user.uid) {
+                        await deleteDoc(doc(db, 'users', docSnapFallback.id));
+                      }
+                      console.log("Successfully migrated user document to use UID as ID");
+                    } catch (e) {
+                      console.error("Migration error", e);
+                    }
+                    if (timeoutId) clearTimeout(timeoutId);
+                    userDataLoadedRef.current = true;
+                    setUserData({ id: docSnapFallback.id, ...legacyData });
+                    setLoading(false);
+                    return;
                   }
-                  console.log("Successfully migrated user document to use UID as ID");
-                } catch (migrationError) {
-                  console.error("Error migrating user document to use UID:", migrationError);
-                  // Fallback without migrating if permission denied or error
-                  if (timeoutId) clearTimeout(timeoutId);
-                  userDataLoadedRef.current = true;
-                  setUserData({ id: docSnapFallback.id, ...legacyData });
-                  setLoading(false);
                 }
-              } else {
-                // If querySnap.empty is true, auto-create a user document for this email
-                console.log("No user document found for email:", emailLower, ". Auto-creating default user document.");
-                const defaultName = user.displayName || (emailLower ? emailLower.split('@')[0] : 'مستخدم جديد');
-                const defaultRole = emailLower.includes('admin') ? 'admin' : (emailLower.includes('teacher') ? 'teacher' : 'student');
                 
-                const defaultUserDoc = {
-                  id: user.uid,
-                  email: emailLower,
-                  name: defaultName,
-                  phone: '01000000000',
-                  governorate: 'القاهرة',
-                  role: defaultRole,
-                  createdAt: new Date().toISOString(),
-                  isApproved: true,
-                  stars: 0,
-                  points: 0,
-                  ...(defaultRole === 'student' ? {
-                    grade: 'الأول الثانوي',
-                    school: 'المدرسة الثانوية',
-                    parentPhone: '01100000000'
-                  } : {}),
-                  ...(defaultRole === 'teacher' ? {
-                    subject: 'الفيزياء',
-                    nationalId: '12345678901234',
-                    dateOfBirth: '1990-01-01',
-                    teachingGrades: ['الأول الثانوي', 'الثاني الثانوي', 'الثالث الثانوي']
-                  } : {})
-                };
-
-                try {
+                // Still no document
+                if (emailLower === 'ahmed@admin.com') {
+                  const defaultUserDoc = {
+                    id: user.uid,
+                    email: emailLower,
+                    name: 'مدير النظام',
+                    phone: '01000000000',
+                    governorate: 'القاهرة',
+                    role: 'admin',
+                    createdAt: new Date().toISOString(),
+                    isApproved: true,
+                    stars: 0,
+                    points: 0
+                  };
                   await setDoc(doc(db, 'users', user.uid), defaultUserDoc);
-                  console.log("Auto-created default user document for user:", user.uid);
                   if (timeoutId) clearTimeout(timeoutId);
                   userDataLoadedRef.current = true;
                   setUserData(defaultUserDoc);
                   setLoading(false);
-                } catch (createError) {
-                  console.error("Failed to auto-create user document:", createError);
+                } else {
+                  console.log("No user document found for:", emailLower || user.uid);
                   if (timeoutId) clearTimeout(timeoutId);
-                  toast.error("لم نتمكن من تهيئة بيانات حسابك في قاعدة البيانات.");
-                  auth.signOut().then(() => {
-                    navigate('/login');
-                  });
-                  setLoading(false);
+                  
+                  // Wait a little bit before assuming they don't exist, to prevent race conditions
+                  // If we still don't find them, just sign out. DO NOT delete the auth user.
+                  setTimeout(() => {
+                    if (!userDataLoadedRef.current) {
+                      toast.error("يبدو أن هناك مشكلة في تحميل بيانات حسابك. يرجى تسجيل الدخول مرة أخرى.");
+                      auth.signOut().then(() => {
+                        navigate('/login');
+                      });
+                      setLoading(false);
+                    }
+                  }, 2000);
                 }
-              }
-            }).catch(async (err) => {
-              console.error("Error fetching fallback user data by email:", err);
-              // Try to auto-create even if query fails
-              const defaultName = user.displayName || (emailLower ? emailLower.split('@')[0] : 'مستخدم جديد');
-              const defaultRole = emailLower.includes('admin') ? 'admin' : (emailLower.includes('teacher') ? 'teacher' : 'student');
-              const defaultUserDoc = {
-                id: user.uid,
-                email: emailLower,
-                name: defaultName,
-                phone: '01000000000',
-                governorate: 'القاهرة',
-                role: defaultRole,
-                createdAt: new Date().toISOString(),
-                isApproved: true,
-                stars: 0,
-                points: 0,
-                ...(defaultRole === 'student' ? {
-                  grade: 'الأول الثانوي',
-                  school: 'المدرسة الثانوية',
-                  parentPhone: '01100000000'
-                } : {}),
-                ...(defaultRole === 'teacher' ? {
-                  subject: 'الفيزياء',
-                  nationalId: '12345678901234',
-                  dateOfBirth: '1990-01-01',
-                  teachingGrades: ['الأول الثانوي', 'الثاني الثانوي', 'الثالث الثانوي']
-                } : {})
-              };
-
-              try {
-                await setDoc(doc(db, 'users', user.uid), defaultUserDoc);
-                console.log("Auto-created default user document after query failure for user:", user.uid);
+             } catch (err) {
+                console.error("Error fetching fallback user data by email:", err);
                 if (timeoutId) clearTimeout(timeoutId);
-                userDataLoadedRef.current = true;
-                setUserData(defaultUserDoc);
+                toast.error("خطأ في جلب البيانات. يرجى المحاولة لاحقاً.");
+                auth.signOut().then(() => {
+                  navigate('/login');
+                });
                 setLoading(false);
-              } catch (createError) {
-                console.error("Failed to auto-create user document after query failure:", createError);
-                if (timeoutId) clearTimeout(timeoutId);
-                setLoading(false);
-              }
-            });
-          } else {
-            // No email and no UID document - Auto-create with random email-like name or placeholder
-            console.log("No document and no email available for user:", user.uid, ". Auto-creating user profile.");
-            const defaultUserDoc = {
-              id: user.uid,
-              email: emailLower || `${user.uid}@placeholder.com`,
-              name: user.displayName || 'طالب جديد',
-              phone: '01000000000',
-              governorate: 'القاهرة',
-              role: 'student',
-              createdAt: new Date().toISOString(),
-              isApproved: true,
-              stars: 0,
-              points: 0,
-              grade: 'الأول الثانوي',
-              school: 'المدرسة الثانوية',
-              parentPhone: '01100000000'
-            };
-
-            try {
-              await setDoc(doc(db, 'users', user.uid), defaultUserDoc);
-              console.log("Auto-created default user document for uid:", user.uid);
-              if (timeoutId) clearTimeout(timeoutId);
-              userDataLoadedRef.current = true;
-              setUserData(defaultUserDoc);
-              setLoading(false);
-            } catch (createError) {
-              console.error("Failed to auto-create user document without email:", createError);
-              if (timeoutId) clearTimeout(timeoutId);
-              toast.error("لم نتمكن من تهيئة بيانات حسابك في قاعدة البيانات.");
-              auth.signOut().then(() => {
-                navigate('/login');
-              });
-              setLoading(false);
-            }
+             }
           }
         }, (error) => {
           console.error("Error listening to user data in real-time:", error);
@@ -3083,6 +3006,11 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Bank / Electronic Transfer Recharge Request Form */}
+                {userData?.role === 'student' && (
+                  <WalletRechargeRequestForm userData={userData} />
+                )}
 
                 {/* Transaction Logs */}
                 <div className="bg-white dark:bg-[#1A1A24] rounded-3xl p-8 border border-gray-200 dark:border-[#2D2D3D] shadow-sm space-y-6">
