@@ -62,68 +62,17 @@ const _0x1a2b = () => {
   }, []);
 
   return (
-    <div id="_sys_brand" className="w-full flex flex-col md:flex-row items-center justify-between gap-4 bg-gray-50 dark:bg-[#1A1A24] p-4 rounded-2xl border border-gray-200 dark:border-[#2D2D3D] shadow-sm my-2 text-right">
-      <div className="flex flex-col items-center md:items-start">
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-0.5">تصميم وتطوير بكل حب ❤️ بواسطة</span>
-        <a 
-          href="https://wa.me/201034859313"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-base font-black bg-gradient-to-r from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] bg-clip-text text-transparent hover:opacity-80 transition-opacity"
-        >
-          {b || 'Fox Tech'}
-        </a>
-      </div>
-      
-      <div className="flex items-center gap-2 flex-wrap justify-center">
-        {/* WhatsApp */}
-        <a 
-          href="https://wa.me/201034859313" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          title="واتساب 01034859313"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500 hover:text-white transition-all text-xs font-bold shadow-sm"
-        >
-          <LucideIcons.MessageCircle className="w-4 h-4 shrink-0" />
-          <span>واتساب: 01034859313</span>
-        </a>
-        
-        {/* Telegram */}
-        <a 
-          href="https://t.me/FoxTech_1" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          title="تليجرام @FoxTech_1"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all text-xs font-bold shadow-sm"
-        >
-          <LucideIcons.Send className="w-4 h-4 shrink-0" />
-          <span>تليجرام: @FoxTech_1</span>
-        </a>
-        
-        {/* TikTok */}
-        <a 
-          href="https://www.tiktok.com/@fox.tech_1" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          title="تيك توك @fox.tech_1"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-black hover:text-white transition-all text-xs font-bold shadow-sm"
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
-          <span>تيك توك: @fox.tech_1</span>
-        </a>
-        
-        {/* Facebook */}
-        <a 
-          href="https://www.facebook.com/share/195WhiV182/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          title="فيسبوك"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white transition-all text-xs font-bold shadow-sm"
-        >
-          <LucideIcons.Facebook className="w-4 h-4 shrink-0" />
-          <span>فيسبوك</span>
-        </a>
-      </div>
+    <div id="_sys_brand" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400">
+      <span>تصميم وتطوير بكل حب ❤️ بواسطة</span>
+      <a 
+        href="https://wa.me/201034859313" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="inline-flex items-center gap-1 text-[#00B4D8] dark:text-[#D4AF37] hover:text-[#0077B6] dark:hover:text-[#B8860B] hover:underline font-extrabold transition-all duration-200"
+      >
+        <span>{b || 'Fox Tech'}</span>
+        <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+      </a>
     </div>
   );
 };
@@ -1073,8 +1022,76 @@ export default function LandingPage() {
             </div>
           </div>
 
+          {/* Dedicated Fox Tech Contact Box */}
+          <div className="pt-8 mt-8 border-t border-gray-200 dark:border-[#2D2D3D]">
+            <div className="p-4 sm:p-5 rounded-2xl bg-gray-50 dark:bg-[#1A1A24] border border-gray-200/80 dark:border-[#2D2D3D] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 text-right">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 flex items-center justify-center text-[#00B4D8] dark:text-[#D4AF37] shrink-0 font-black text-sm border border-[#00B4D8]/20 dark:border-[#D4AF37]/20">
+                  FT
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <span>تواصل مع Fox Tech للتطوير والبرمجة</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#00B4D8]/15 dark:bg-[#D4AF37]/15 text-[#00B4D8] dark:text-[#D4AF37] font-bold">
+                      مطور المنصة
+                    </span>
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+                    لطلب مواقع وتطبيقات وخدمات تطوير برمجية متكاملة
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
+                {/* WhatsApp */}
+                <a 
+                  href="https://wa.me/201034859313" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-600 hover:text-white transition-all text-xs font-bold shadow-xs border border-green-500/20"
+                >
+                  <LucideIcons.MessageCircle className="w-4 h-4 shrink-0" />
+                  <span dir="ltr">01034859313</span>
+                </a>
+                
+                {/* Telegram */}
+                <a 
+                  href="https://t.me/FoxTech_1" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-500/10 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all text-xs font-bold shadow-xs border border-blue-500/20"
+                >
+                  <LucideIcons.Send className="w-4 h-4 shrink-0" />
+                  <span>@FoxTech_1</span>
+                </a>
+                
+                {/* TikTok */}
+                <a 
+                  href="https://www.tiktok.com/@fox.tech_1" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-black hover:text-white transition-all text-xs font-bold shadow-xs border border-gray-300 dark:border-gray-700"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+                  <span>@fox.tech_1</span>
+                </a>
+                
+                {/* Facebook */}
+                <a 
+                  href="https://www.facebook.com/share/195WhiV182/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all text-xs font-bold shadow-xs border border-indigo-600/20"
+                >
+                  <LucideIcons.Facebook className="w-4 h-4 shrink-0" />
+                  <span>فيسبوك</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
           {/* Bottom Copyright Bar with Fox Tech clickable link */}
-          <div className="pt-8 mt-8 border-t border-gray-200 dark:border-[#2D2D3D] flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400 text-center">
+          <div className="pt-6 mt-6 border-t border-gray-200/60 dark:border-[#2D2D3D]/60 flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400 text-center">
             <div>
               جميع الحقوق محفوظة لـ <span className="text-gray-800 dark:text-gray-200">منصة Teachland</span> © ٢٠٢٦
             </div>

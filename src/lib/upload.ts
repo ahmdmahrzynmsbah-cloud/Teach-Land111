@@ -162,9 +162,122 @@ async function compressImage(file: File): Promise<File> {
 
 import { storage } from './firebase';
 
+function uploadViaLocalExpress(
+  file: File,
+  onProgress: (progress: number) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload', true);
+    
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const progress = Math.min((event.loaded / event.total) * 100, 99);
+        onProgress(progress);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.url) {
+            onProgress(100);
+            resolve(response.url);
+            return;
+          }
+        } catch (e) {
+          // invalid json
+        }
+      }
+      reject(new Error(`Server upload failed with status ${xhr.status}`));
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during local server upload'));
+    };
+
+    xhr.send(formData);
+  });
+}
+
+function uploadViaFirebase(
+  file: File,
+  onProgress: (progress: number) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const fileExtension = file.name.split('.').pop() || 'bin';
+      const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+      const storageRef = ref(storage, fileName);
+
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      let hasMadeProgress = false;
+      const timeoutTimer = setTimeout(() => {
+        if (!hasMadeProgress) {
+          try {
+            uploadTask.cancel();
+          } catch (e) {}
+          reject(new Error('Firebase Storage upload connection timed out'));
+        }
+      }, 4000);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          hasMadeProgress = true;
+          clearTimeout(timeoutTimer);
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          onProgress(Math.min(progress, 99));
+        },
+        (error) => {
+          clearTimeout(timeoutTimer);
+          reject(error);
+        },
+        async () => {
+          clearTimeout(timeoutTimer);
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            onProgress(100);
+            resolve(downloadURL);
+          } catch (e) {
+            reject(e);
+          }
+        }
+      );
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function uploadViaBase64(
+  file: File,
+  onProgress: (progress: number) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    onProgress(10);
+    const reader = new FileReader();
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress(Math.min((event.loaded / event.total) * 100, 99));
+      }
+    };
+    reader.onload = () => {
+      onProgress(100);
+      resolve(reader.result as string);
+    };
+    reader.onerror = () => reject(new Error('فشل قراءة الملف كـ Base64'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export async function uploadFileToFirebase(
   originalFile: File,
-  onProgress: (progress: number) => void,
+  onProgress: (progress: number) => void = () => {},
   options?: UploadOptions
 ): Promise<string> {
   // Compress image if applicable
@@ -200,104 +313,28 @@ export async function uploadFileToFirebase(
     }
   }
 
-  // Try Firebase Storage first, if it fails due to CORS or rules, fallback to local Express API, then Base64
-  return new Promise((resolve, reject) => {
-    try {
-      const fileExtension = file.name.split('.').pop();
-      const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
-      const storageRef = ref(storage, fileName);
+  // 1. Try local Express server upload first (fastest and most reliable for all file types)
+  try {
+    const localUrl = await uploadViaLocalExpress(file, onProgress);
+    if (localUrl) return localUrl;
+  } catch (err) {
+    console.warn('Local Express upload failed, attempting Firebase Storage fallback...', err);
+  }
 
-      const uploadTask = uploadBytesResumable(storageRef, file);
+  // 2. Try Firebase Storage with 4-second connection timeout
+  try {
+    const firebaseUrl = await uploadViaFirebase(file, onProgress);
+    if (firebaseUrl) return firebaseUrl;
+  } catch (fbErr) {
+    console.warn('Firebase Storage upload failed or timed out, attempting Base64 fallback...', fbErr);
+  }
 
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          onProgress(Math.min(progress, 99));
-        }, 
-        (error) => {
-          console.warn("Firebase Storage Upload Error, falling back to local server:", error);
-          // Fallback to local express server
-          const formData = new FormData();
-          formData.append('file', file);
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/api/upload', true);
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const progress = (event.loaded / event.total) * 100;
-              onProgress(Math.min(progress, 99.9));
-            }
-          };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const response = JSON.parse(xhr.responseText);
-                onProgress(100);
-                resolve(response.url);
-              } catch (e) {
-                // Base64 fallback
-                if (file.size <= 25 * 1024 * 1024) {
-                  const reader = new FileReader();
-                  reader.onload = () => { onProgress(100); resolve(reader.result as string); };
-                  reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-                  reader.readAsDataURL(file);
-                } else {
-                  reject(new Error('استجابة غير صالحة من الخادم أثناء الرفع.'));
-                }
-              }
-            } else {
-              // Base64 fallback if <= 25MB
-              if (file.size <= 25 * 1024 * 1024) {
-                const reader = new FileReader();
-                reader.onload = () => { onProgress(100); resolve(reader.result as string); };
-                reader.onerror = () => reject(new Error('فشل قراءة الملف كـ Base64'));
-                reader.readAsDataURL(file);
-              } else if (xhr.status === 404) {
-                 reject(new Error('فشل الرفع: الخادم لا يدعم رفع الملفات (تأكد من إعداد Firebase Storage أو الخادم).'));
-              } else {
-                 reject(new Error(`فشل الرفع من الخادم: رمز الحالة ${xhr.status}`));
-              }
-            }
-          };
-          xhr.onerror = () => {
-            if (file.size <= 25 * 1024 * 1024) {
-              const reader = new FileReader();
-              reader.onload = () => { onProgress(100); resolve(reader.result as string); };
-              reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-              reader.readAsDataURL(file);
-            } else {
-              reject(new Error('حدث خطأ في الاتصال بالشبكة أثناء رفع الملف.'));
-            }
-          };
-          xhr.send(formData);
-        }, 
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            onProgress(100);
-            resolve(downloadURL);
-          } catch (e: any) {
-            if (file.size <= 25 * 1024 * 1024) {
-              const reader = new FileReader();
-              reader.onload = () => { onProgress(100); resolve(reader.result as string); };
-              reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-              reader.readAsDataURL(file);
-            } else {
-              reject(new Error('فشل الحصول على رابط الملف: ' + e.message));
-            }
-          }
-        }
-      );
-    } catch (e: any) {
-      if (file.size <= 25 * 1024 * 1024) {
-        const reader = new FileReader();
-        reader.onload = () => { onProgress(100); resolve(reader.result as string); };
-        reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-        reader.readAsDataURL(file);
-      } else {
-        reject(new Error('حدث خطأ في عملية الرفع: ' + e.message));
-      }
-    }
-  });
+  // 3. Final Fallback: Base64 data URL for files <= 25MB
+  if (file.size <= 25 * 1024 * 1024) {
+    return await uploadViaBase64(file, onProgress);
+  }
+
+  throw new Error('فشل رفع الملف. يرجى التأكد من اختيار ملف صالحة وإعادة المحاولة.');
 }
 
 /**
@@ -311,17 +348,12 @@ export async function uploadChunkedFile(
   const isVideo = file.type.startsWith('video/');
   const useBunny = options?.bunny !== undefined ? options.bunny : isVideo;
 
-  // Stage 1: Try Firebase Storage direct upload first
-  try {
-    const firebaseUrl = await uploadFileToFirebase(file, onProgress, options);
-    if (firebaseUrl) {
-      return firebaseUrl;
-    }
-  } catch (fbErr) {
-    console.warn('Firebase Storage upload attempted in uploadChunkedFile, falling back...', fbErr);
+  // If it's a PDF or non-video document or bunny is false, use direct fast upload
+  if (!useBunny || !isVideo) {
+    return await uploadFileToFirebase(file, onProgress, options);
   }
 
-  // Stage 2: Try Express API chunked upload (for local server or Bunny CDN processing)
+  // Stage 1: Express API chunked upload (for large videos / Bunny CDN processing)
   try {
     const chunkSize = 500 * 1024; // 500KB chunks
     const totalChunks = Math.ceil(file.size / chunkSize);
@@ -374,22 +406,9 @@ export async function uploadChunkedFile(
       return data.url;
     }
   } catch (serverErr) {
-    console.warn('Express chunked upload failed, trying final fallback...', serverErr);
+    console.warn('Express chunked video upload failed, trying direct upload fallback...', serverErr);
   }
 
-  // Stage 3: Base64 fallback for files <= 25MB (PDFs, images, documents)
-  if (file.size <= 25 * 1024 * 1024) {
-    return new Promise((resolve, reject) => {
-      onProgress(50);
-      const reader = new FileReader();
-      reader.onload = () => {
-        onProgress(100);
-        resolve(reader.result as string);
-      };
-      reader.onerror = () => reject(new Error('فشل قراءة ملف الـ PDF كـ Base64'));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  throw new Error('فشل رفع الملف. يرجى التحقق من الاتصال وإعادة المحاولة.');
+  // Stage 2: Direct upload fallback
+  return await uploadFileToFirebase(file, onProgress, options);
 }
