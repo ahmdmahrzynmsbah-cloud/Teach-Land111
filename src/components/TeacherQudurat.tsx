@@ -122,11 +122,12 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
   const handlePdfUpload = async (file: File) => {
     if (!file) return;
     setPdfUploading(true);
-    setPdfProgress(0);
+    setPdfProgress(10);
     try {
-      const url = await uploadChunkedFile(file, (p) => setPdfProgress(p), {
-        bunny: false
+      const url = await uploadFileToFirebase(file, (p) => setPdfProgress(p), {
+        maxSizeBytes: 50 * 1024 * 1024
       });
+      setPdfProgress(100);
       setPdfUrl(url);
       toast.success('تم رفع ملف المذكرة الـ PDF بنجاح! 📄');
     } catch (err: any) {
