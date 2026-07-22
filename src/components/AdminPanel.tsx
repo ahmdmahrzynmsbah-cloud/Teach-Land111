@@ -1353,6 +1353,9 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
         tahsiliVideoProvider: (formData.get('tahsiliVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
         quduratVideoTitle: (formData.get('quduratVideoTitle') as string) || 'الفيديو التعريفي لمسار القدرات 🎯',
         tahsiliVideoTitle: (formData.get('tahsiliVideoTitle') as string) || 'الفيديو التعريفي لمسار التحصيلي 🚀',
+        heroVideoUrl: (formData.get('heroVideoUrl') as string) || '',
+        heroVideoProvider: (formData.get('heroVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
+        heroVideoTitle: (formData.get('heroVideoTitle') as string) || 'الفيديو التعريفي لمنصة Teachland 🚀',
         socialLinks: {
           facebook: (formData.get('facebook') as string) || platformSettings.socialLinks?.facebook || '',
           twitter: (formData.get('twitter') as string) || platformSettings.socialLinks?.twitter || '',
@@ -2487,6 +2490,50 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                       className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-4 py-2.5 outline-none focus:border-[#00B4D8] dark:focus:border-[#D4AF37] dark:text-white font-bold text-sm leading-relaxed"
                       required
                     />
+                  </div>
+
+                  {/* Platform Hero Promo Video Settings */}
+                  <div className="p-4 bg-white dark:bg-[#12121A] rounded-xl border border-gray-200 dark:border-[#2D2D3D] space-y-3 mt-4">
+                    <h4 className="text-xs sm:text-sm font-black text-[#00B4D8] dark:text-[#D4AF37] flex items-center gap-1.5 border-b border-gray-100 dark:border-[#222230] pb-2">
+                      <Film className="w-4 h-4 text-[#00B4D8] dark:text-[#D4AF37]" />
+                      الفيديو التعريفي للمنصة (الظاهر في الهيرو الرئيسي) 🎬
+                    </h4>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">عنوان الفيديو التعريفي</label>
+                      <input
+                        type="text"
+                        name="heroVideoTitle"
+                        defaultValue={platformSettings.heroVideoTitle || 'الفيديو التعريفي لمنصة Teachland 🚀'}
+                        className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
+                        placeholder="مثال: جولة داخل المنصة والتعرف على المزايا الكبيرة"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">مزود الفيديو</label>
+                        <select
+                          name="heroVideoProvider"
+                          defaultValue={platformSettings.heroVideoProvider || 'youtube'}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs cursor-pointer"
+                        >
+                          <option value="youtube">يوتيوب (YouTube Link)</option>
+                          <option value="tiktok">تيك توك (TikTok Link)</option>
+                          <option value="bunny">باني ستريم (Bunny Stream ID)</option>
+                          <option value="direct">رابط فيديو مباشر (Direct MP4 / WebM)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">رابط الفيديو أو معرف الفيديو (Video URL / Stream ID)</label>
+                        <input
+                          type="text"
+                          name="heroVideoUrl"
+                          defaultValue={platformSettings.heroVideoUrl || ''}
+                          className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-mono text-xs text-left"
+                          dir="ltr"
+                          placeholder="https://www.youtube.com/watch?v=... أو رابط مباشر"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

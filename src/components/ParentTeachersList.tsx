@@ -62,8 +62,8 @@ const ParentTeachersList: React.FC<ParentTeachersListProps> = ({ userData, linke
   }, [linkedStudent?.id]);
 
   const filteredTeachers = teachers.filter(t => 
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+    (t.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+    (t.subject || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   if (loading) {

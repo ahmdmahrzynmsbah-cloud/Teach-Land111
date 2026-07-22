@@ -50,7 +50,10 @@ export const defaultSettings: PlatformSettings = {
   quduratVideoProvider: 'youtube',
   tahsiliVideoProvider: 'youtube',
   quduratVideoTitle: 'الفيديو التعريفي لمسار القدرات 🎯',
-  tahsiliVideoTitle: 'الفيديو التعريفي لمسار التحصيلي 🚀'
+  tahsiliVideoTitle: 'الفيديو التعريفي لمسار التحصيلي 🚀',
+  heroVideoUrl: '',
+  heroVideoProvider: 'youtube',
+  heroVideoTitle: 'الفيديو التعريفي لمنصة Teachland 🚀'
 };
 
 interface PlatformSettingsContextType {

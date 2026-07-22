@@ -395,9 +395,10 @@ export default function TeacherQudurat({ userData }: TeacherQuduratProps) {
 
   // Filtered reviews
   const filteredReviews = reviews.filter(r => {
-    const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          r.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          r.subject.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = (searchTerm || '').toLowerCase();
+    const matchesSearch = (r.title || '').toLowerCase().includes(term) || 
+                          (r.description || '').toLowerCase().includes(term) ||
+                          (r.subject || '').toLowerCase().includes(term);
     const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

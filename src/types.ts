@@ -45,6 +45,9 @@ export interface PlatformSettings {
   tahsiliVideoProvider?: 'bunny' | 'tiktok' | 'youtube' | 'direct';
   quduratVideoTitle?: string;
   tahsiliVideoTitle?: string;
+  heroVideoUrl?: string;
+  heroVideoProvider?: 'bunny' | 'tiktok' | 'youtube' | 'direct';
+  heroVideoTitle?: string;
 }
 
 export interface User {

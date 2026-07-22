@@ -1151,7 +1151,7 @@ export default function FinancesManager({ userData }: FinancesManagerProps) {
                   {/* Header */}
                   <div className="flex justify-between items-start border-b border-gray-200 dark:border-[#2D2D3D] print:border-gray-200 pb-6">
                     <div>
-                      <h2 className="text-2xl font-black text-gray-900 dark:text-white print:text-black">كشف حساب مالي تفصيلي</h2>
+                      <h2 className="text-2xl font-black text-gray-900 dark:text-white print:text-black">{isTeacher ? 'إيرادات النشاط' : 'ميزان المراجعة'}</h2>
                       <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mt-1">
                         عن الفترة من: <span className="font-mono">{statementStartDate || 'البداية'}</span> إلى: <span className="font-mono">{statementEndDate || 'الآن'}</span>
                       </p>

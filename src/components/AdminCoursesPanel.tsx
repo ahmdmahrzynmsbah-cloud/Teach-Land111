@@ -174,9 +174,10 @@ export default function AdminCoursesPanel() {
 
   // Filters logic
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          c.teacherName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = (searchQuery || '').toLowerCase();
+    const matchesSearch = (c.title || '').toLowerCase().includes(q) || 
+                          (c.teacherName || '').toLowerCase().includes(q) ||
+                          (c.subject || '').toLowerCase().includes(q);
     const matchesGrade = selectedGrade === 'all' || c.grade === selectedGrade;
     
     const courseIsActive = c.isActive !== false;

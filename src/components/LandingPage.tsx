@@ -48,35 +48,6 @@ const IconMap: Record<string, any> = {
   Instagram: LucideIcons.Instagram
 };
 
-const _0x1a2b = () => {
-  const [b, setB] = useState('');
-  useEffect(() => {
-    setB(atob('Rm94IFRlY2g='));
-    const t = setInterval(() => {
-      const el = document.getElementById('_sys_brand');
-      if (!el || !el.innerHTML.includes(atob('Rm94IFRlY2g='))) {
-        document.body.innerHTML = '';
-      }
-    }, 2000);
-    return () => clearInterval(t);
-  }, []);
-
-  return (
-    <div id="_sys_brand" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400">
-      <span>تصميم وتطوير بكل حب ❤️ بواسطة</span>
-      <a 
-        href="https://wa.me/201034859313" 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="inline-flex items-center gap-1 text-[#00B4D8] dark:text-[#D4AF37] hover:text-[#0077B6] dark:hover:text-[#B8860B] hover:underline font-extrabold transition-all duration-200"
-      >
-        <span>{b || 'Fox Tech'}</span>
-        <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-      </a>
-    </div>
-  );
-};
-
 export default function LandingPage() {
   const { settings } = usePlatformSettings();
   const navigate = useNavigate();
@@ -107,7 +78,45 @@ export default function LandingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isHeroVideoModalOpen, setIsHeroVideoModalOpen] = useState(false);
+  const [isHeroVideoPlayingInline, setIsHeroVideoPlayingInline] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+
+  const renderHeroVideo = (url: string, provider?: string, title?: string) => {
+    if (!url) return null;
+
+    if (provider === 'bunny' || (!url.includes('http') && !url.includes('youtube') && !url.includes('tiktok'))) {
+      return <BunnyVideoPlayer videoId={url} />;
+    }
+
+    if (provider === 'tiktok' || url.includes('tiktok.com')) {
+      return <TikTokPlayer videoUrl={url} />;
+    }
+
+    if (provider === 'direct' || url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.m3u8')) {
+      return (
+        <video
+          src={url}
+          controls
+          autoPlay
+          className="w-full h-full object-cover rounded-xl"
+        >
+          متصفحك لا يدعم تشغيل الفيديو المباشر.
+        </video>
+      );
+    }
+
+    const embedUrl = getYoutubeEmbedUrl(url);
+    return (
+      <iframe
+        src={embedUrl + (embedUrl.includes('?') ? '&autoplay=1' : '?autoplay=1')}
+        className="w-full h-full object-cover rounded-xl border-0"
+        title={title || 'Hero Video'}
+        allowFullScreen
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      />
+    );
+  };
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
   // Subject Browser States (Removed)
@@ -285,8 +294,19 @@ export default function LandingPage() {
                   سجل مجاناً دلوقتي
                 </Link>
               )}
-              <button className="px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-sm sm:text-lg border-2 border-gray-200 dark:border-[#2D2D3D] text-gray-600 dark:text-gray-300 hover:border-[#00B4D8] dark:border-[#D4AF37] hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors flex items-center justify-center gap-2 bg-white dark:bg-[#1A1A24]">
-                <Play className="w-4 h-4 sm:w-5 sm:h-5" /> جرب حصة مجانية
+              <button 
+                onClick={() => {
+                  if (settings.heroVideoUrl) {
+                    setIsHeroVideoModalOpen(true);
+                  } else {
+                    const el = document.getElementById('grades');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-sm sm:text-lg border-2 border-gray-200 dark:border-[#2D2D3D] text-gray-600 dark:text-gray-300 hover:border-[#00B4D8] dark:hover:border-[#D4AF37] hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all flex items-center justify-center gap-2 bg-white dark:bg-[#1A1A24] cursor-pointer shadow-sm hover:shadow-md"
+              >
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 text-[#00B4D8] dark:text-[#D4AF37] fill-[#00B4D8] dark:fill-[#D4AF37]" /> 
+                {settings.heroVideoUrl ? (settings.heroVideoTitle || 'شاهد الفيديو التعريفي 🎬') : 'جرب حصة مجانية'}
               </button>
             </div>
             
@@ -316,26 +336,66 @@ export default function LandingPage() {
                 
                 {/* Floating UI Elements imitating Abwaab */}
                 <div className="relative w-[85%] h-[90%] bg-white dark:bg-[#1A1A24] rounded-3xl shadow-2xl border border-gray-100 dark:border-[#2D2D3D] overflow-hidden flex flex-col">
-                   <div className="h-12 bg-gray-50 dark:bg-[#0D0D12] border-b border-gray-200 dark:border-[#2D2D3D] flex items-center px-4 gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                   </div>
-                   <div className="p-6 flex-1 flex flex-col gap-4">
-                      <div className="w-3/4 h-8 bg-gray-100 dark:bg-[#222230] rounded-lg"></div>
-                      <div className="w-full aspect-video bg-gray-950 rounded-xl relative flex items-center justify-center">
-                         <div className="w-12 h-12 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-full flex items-center justify-center">
-                            <Play className="w-5 h-5 text-white ml-1" />
-                         </div>
+                   <div className="h-12 bg-gray-50 dark:bg-[#0D0D12] border-b border-gray-200 dark:border-[#2D2D3D] flex items-center justify-between px-4 gap-2">
+                      <div className="flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                         <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                         <div className="w-3 h-3 rounded-full bg-green-400"></div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 mt-2">
-                         <div className="bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 rounded-xl border border-[#00B4D8]/20 dark:border-[#D4AF37]/20 p-4">
-                            <div className="w-6 h-6 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-md mb-2"></div>
-                            <div className="w-20 h-4 bg-gray-200 dark:bg-[#2D2D3D] rounded"></div>
+                      <span className="text-[11px] font-black text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                         {settings.heroVideoTitle || settings.platformName}
+                      </span>
+                   </div>
+                   <div className="p-5 flex-1 flex flex-col gap-3">
+                      <div className="w-3/4 h-7 bg-gray-100 dark:bg-[#222230] rounded-lg flex items-center px-3">
+                         <span className="text-xs font-black text-[#00B4D8] dark:text-[#D4AF37] truncate">
+                            {settings.heroVideoTitle || 'الفيديو التعريفي للمنصة 🚀'}
+                         </span>
+                      </div>
+                      
+                      {/* Video Container */}
+                      <div className="w-full aspect-video bg-gray-950 rounded-xl relative flex items-center justify-center overflow-hidden shadow-inner group border border-gray-800">
+                         {settings.heroVideoUrl && isHeroVideoPlayingInline ? (
+                            renderHeroVideo(settings.heroVideoUrl, settings.heroVideoProvider, settings.heroVideoTitle)
+                         ) : (
+                            <div 
+                               onClick={() => {
+                                  if (settings.heroVideoUrl) {
+                                     setIsHeroVideoPlayingInline(true);
+                                  } else {
+                                     setIsHeroVideoModalOpen(true);
+                                  }
+                               }}
+                               className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white p-4 cursor-pointer group hover:scale-[1.02] transition-all duration-300"
+                            >
+                               <div className="w-14 h-14 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-full flex items-center justify-center shadow-lg shadow-[#00B4D8]/40 dark:shadow-[#D4AF37]/40 group-hover:scale-110 transition-all duration-300">
+                                  <Play className="w-6 h-6 text-white ml-1 fill-white" />
+                               </div>
+                               <span className="text-xs font-bold text-gray-200 mt-3 group-hover:text-white transition-colors">
+                                  {settings.heroVideoUrl ? 'اضغط لمشاهدة الفيديو التعريفي 🎬' : 'معاينة المنصة'}
+                               </span>
+                            </div>
+                         )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mt-1">
+                         <div className="bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 rounded-xl border border-[#00B4D8]/20 dark:border-[#D4AF37]/20 p-3 flex items-center gap-2">
+                            <div className="w-8 h-8 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-lg flex items-center justify-center shrink-0">
+                               <Film className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="min-w-0">
+                               <div className="text-[11px] font-black text-gray-800 dark:text-white truncate">فيديوهات تفاعلية</div>
+                               <div className="text-[9px] text-gray-400 font-bold truncate">شرح بأحدث الوسائل</div>
+                            </div>
                          </div>
-                         <div className="bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 rounded-xl border border-[#00B4D8]/10 dark:border-[#D4AF37]/10 p-4">
-                            <div className="w-6 h-6 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-md mb-2"></div>
-                            <div className="w-20 h-4 bg-gray-200 dark:bg-[#2D2D3D] rounded"></div>
+                         <div className="bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 rounded-xl border border-[#00B4D8]/10 dark:border-[#D4AF37]/10 p-3 flex items-center gap-2">
+                            <div className="w-8 h-8 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-lg flex items-center justify-center shrink-0">
+                               <Sparkles className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="min-w-0">
+                               <div className="text-[11px] font-black text-gray-800 dark:text-white truncate">اختبارات ذكية</div>
+                               <div className="text-[9px] text-gray-400 font-bold truncate">تصحيح فوري وتقارير</div>
+                            </div>
                          </div>
                       </div>
                    </div>
@@ -1022,80 +1082,22 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Dedicated Fox Tech Contact Box */}
-          <div className="pt-8 mt-8 border-t border-gray-200 dark:border-[#2D2D3D]">
-            <div className="p-4 sm:p-5 rounded-2xl bg-gray-50 dark:bg-[#1A1A24] border border-gray-200/80 dark:border-[#2D2D3D] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 text-right">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 flex items-center justify-center text-[#00B4D8] dark:text-[#D4AF37] shrink-0 font-black text-sm border border-[#00B4D8]/20 dark:border-[#D4AF37]/20">
-                  FT
-                </div>
-                <div>
-                  <h4 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
-                    <span>تواصل مع Fox Tech للتطوير والبرمجة</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#00B4D8]/15 dark:bg-[#D4AF37]/15 text-[#00B4D8] dark:text-[#D4AF37] font-bold">
-                      مطور المنصة
-                    </span>
-                  </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
-                    لطلب مواقع وتطبيقات وخدمات تطوير برمجية متكاملة
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
-                {/* WhatsApp */}
-                <a 
-                  href="https://wa.me/201034859313" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-600 hover:text-white transition-all text-xs font-bold shadow-xs border border-green-500/20"
-                >
-                  <LucideIcons.MessageCircle className="w-4 h-4 shrink-0" />
-                  <span dir="ltr">01034859313</span>
-                </a>
-                
-                {/* Telegram */}
-                <a 
-                  href="https://t.me/FoxTech_1" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-500/10 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all text-xs font-bold shadow-xs border border-blue-500/20"
-                >
-                  <LucideIcons.Send className="w-4 h-4 shrink-0" />
-                  <span>@FoxTech_1</span>
-                </a>
-                
-                {/* TikTok */}
-                <a 
-                  href="https://www.tiktok.com/@fox.tech_1" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-black hover:text-white transition-all text-xs font-bold shadow-xs border border-gray-300 dark:border-gray-700"
-                >
-                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
-                  <span>@fox.tech_1</span>
-                </a>
-                
-                {/* Facebook */}
-                <a 
-                  href="https://www.facebook.com/share/195WhiV182/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all text-xs font-bold shadow-xs border border-indigo-600/20"
-                >
-                  <LucideIcons.Facebook className="w-4 h-4 shrink-0" />
-                  <span>فيسبوك</span>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Copyright Bar with Fox Tech clickable link */}
-          <div className="pt-6 mt-6 border-t border-gray-200/60 dark:border-[#2D2D3D]/60 flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400 text-center">
-            <div>
+          {/* Bottom Copyright Bar */}
+          <div className="pt-6 mt-6 border-t border-gray-200/60 dark:border-[#2D2D3D]/60 flex flex-col md:flex-row items-center justify-center gap-4 text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400 text-center">
+            <div 
+              onClick={(e) => {
+                const count = (Number(e.currentTarget.getAttribute('data-clicks') || 0)) + 1;
+                e.currentTarget.setAttribute('data-clicks', String(count));
+                if (count >= 3) {
+                  window.dispatchEvent(new CustomEvent('open-dev-modal'));
+                  e.currentTarget.setAttribute('data-clicks', '0');
+                }
+                setTimeout(() => e.currentTarget.setAttribute('data-clicks', '0'), 2000);
+              }}
+              className="cursor-default select-none"
+            >
               جميع الحقوق محفوظة لـ <span className="text-gray-800 dark:text-gray-200">منصة Teachland</span> © ٢٠٢٦
             </div>
-            <_0x1a2b />
           </div>
         </div>
       </footer>
@@ -1394,6 +1396,44 @@ export default function LandingPage() {
             </div>
           </div>
         )}
+
+      {/* Hero Video Modal */}
+      {isHeroVideoModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-[#181822] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl overflow-hidden shadow-2xl flex flex-col my-auto max-h-[85vh]">
+            <div className="px-4 py-3 bg-gray-50 dark:bg-[#12121A] border-b border-gray-200 dark:border-[#222230] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0 pr-1">
+                <div className="w-8 h-8 bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] rounded-lg flex items-center justify-center shrink-0">
+                  <Film className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-black text-xs sm:text-sm text-gray-900 dark:text-white truncate">
+                    {settings.heroVideoTitle || 'الفيديو التعريفي للمنصة 🚀'}
+                  </h3>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate">تعرّف على منصة {settings.platformName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHeroVideoModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-[#252533] text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="w-full aspect-video bg-black relative flex items-center justify-center overflow-hidden">
+              {settings.heroVideoUrl ? (
+                renderHeroVideo(settings.heroVideoUrl, settings.heroVideoProvider, settings.heroVideoTitle)
+              ) : (
+                <div className="p-6 text-center space-y-2">
+                  <Film className="w-10 h-10 text-gray-500 dark:text-gray-600 mx-auto" />
+                  <p className="text-xs font-bold text-gray-300 dark:text-gray-400">لم يتم إضافة فيديو تعريفي بعد من إعدادات المنصة عند الأدمن.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <InstallAppModal 
         isOpen={isInstallModalOpen} 

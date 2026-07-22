@@ -184,8 +184,9 @@ export default function QuickNotes({ db, userData }: QuickNotesProps) {
 
   // Filter & Search Logic
   const filteredNotes = notes.filter(note => {
-    const matchesSearch = note.content.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          note.courseTitle.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = (searchTerm || '').toLowerCase();
+    const matchesSearch = (note.content || '').toLowerCase().includes(searchLower) || 
+                          (note.courseTitle || '').toLowerCase().includes(searchLower);
     const matchesCourse = filterCourseId === 'all' || note.courseId === filterCourseId;
     return matchesSearch && matchesCourse;
   }).sort((a, b) => {

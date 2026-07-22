@@ -160,8 +160,6 @@ async function compressImage(file: File): Promise<File> {
  * Unified function to upload files (videos, images, etc.) to the local Express backend with robust error handling and translation.
  */
 
-import { storage } from './firebase';
-
 function uploadViaLocalExpress(
   file: File,
   onProgress: (progress: number) => void
