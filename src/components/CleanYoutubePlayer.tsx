@@ -11,6 +11,7 @@ declare global {
 interface CleanYoutubePlayerProps {
   videoUrl: string;
   title?: string;
+  poster?: string;
 }
 
 // Global script loader helper to avoid multiple injections
@@ -53,7 +54,7 @@ const extractYoutubeId = (url: string) => {
   }
 };
 
-export default function CleanYoutubePlayer({ videoUrl, title }: CleanYoutubePlayerProps) {
+export default function CleanYoutubePlayer({ videoUrl, title, poster }: CleanYoutubePlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerElementRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
@@ -299,6 +300,18 @@ export default function CleanYoutubePlayer({ videoUrl, title }: CleanYoutubePlay
         <div className="absolute inset-0 bg-[#0A0A10] flex flex-col items-center justify-center gap-3 p-4 text-center z-30">
           <span className="text-red-500 font-black text-sm">{error}</span>
           <span className="text-xs text-gray-400 font-bold">يرجى التحقق من الرابط في لوحة التحكم</span>
+        </div>
+      )}
+
+      {/* Poster / Thumbnail Overlay */}
+      {poster && !isPlaying && !error && (
+        <div className="absolute inset-0 z-15 pointer-events-none overflow-hidden">
+          <img 
+            src={poster} 
+            alt={title || 'Cover'} 
+            className="w-full h-full object-cover" 
+          />
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />
         </div>
       )}
 

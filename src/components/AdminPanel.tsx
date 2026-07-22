@@ -1000,6 +1000,9 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
   
   // Settings upload
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [quduratVideoPosterFile, setQuduratVideoPosterFile] = useState<File | null>(null);
+  const [tahsiliVideoPosterFile, setTahsiliVideoPosterFile] = useState<File | null>(null);
+  const [heroVideoPosterFile, setHeroVideoPosterFile] = useState<File | null>(null);
   const [processingPaymentId, setProcessingPaymentId] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [tempSubjects, setTempSubjects] = useState(platformSettings.subjects || []);
@@ -1312,12 +1315,30 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
     const formData = new FormData(e.currentTarget);
     
     let logoUrl = platformSettings.logoUrl;
+    let quduratVideoPoster = (formData.get('quduratVideoPoster') as string) || platformSettings.quduratVideoPoster || '';
+    let tahsiliVideoPoster = (formData.get('tahsiliVideoPoster') as string) || platformSettings.tahsiliVideoPoster || '';
+    let heroVideoPoster = (formData.get('heroVideoPoster') as string) || platformSettings.heroVideoPoster || '';
     
     try {
       if (logoFile) {
         toast.success("جاري رفع شعار المنصة...");
         // Use uploadFileToFirebase instead of Firebase Storage directly to avoid CORS/rules issues
         logoUrl = await uploadFileToFirebase(logoFile, () => {});
+      }
+
+      if (quduratVideoPosterFile) {
+        toast.success("جاري رفع غلاف فيديو القدرات...");
+        quduratVideoPoster = await uploadFileToFirebase(quduratVideoPosterFile, () => {});
+      }
+
+      if (tahsiliVideoPosterFile) {
+        toast.success("جاري رفع غلاف فيديو التحصيلي...");
+        tahsiliVideoPoster = await uploadFileToFirebase(tahsiliVideoPosterFile, () => {});
+      }
+
+      if (heroVideoPosterFile) {
+        toast.success("جاري رفع غلاف الفيديو الرئيسي...");
+        heroVideoPoster = await uploadFileToFirebase(heroVideoPosterFile, () => {});
       }
 
       const updated: any = {
@@ -1353,9 +1374,12 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
         tahsiliVideoProvider: (formData.get('tahsiliVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
         quduratVideoTitle: (formData.get('quduratVideoTitle') as string) || 'الفيديو التعريفي لمسار القدرات 🎯',
         tahsiliVideoTitle: (formData.get('tahsiliVideoTitle') as string) || 'الفيديو التعريفي لمسار التحصيلي 🚀',
+        quduratVideoPoster: quduratVideoPoster || '',
+        tahsiliVideoPoster: tahsiliVideoPoster || '',
         heroVideoUrl: (formData.get('heroVideoUrl') as string) || '',
         heroVideoProvider: (formData.get('heroVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
         heroVideoTitle: (formData.get('heroVideoTitle') as string) || 'الفيديو التعريفي لمنصة Teachland 🚀',
+        heroVideoPoster: heroVideoPoster || '',
         socialLinks: {
           facebook: (formData.get('facebook') as string) || platformSettings.socialLinks?.facebook || '',
           twitter: (formData.get('twitter') as string) || platformSettings.socialLinks?.twitter || '',
@@ -1366,6 +1390,9 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
 
       await updateSettings(updated);
       setLogoFile(null);
+      setQuduratVideoPosterFile(null);
+      setTahsiliVideoPosterFile(null);
+      setHeroVideoPosterFile(null);
       toast.success("تم حفظ إعدادات المنصة وتحديثها بنجاح! ✨");
     } catch (err) {
       console.error("Error saving settings:", err);
@@ -2416,6 +2443,45 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                           placeholder="https://www.youtube.com/watch?v=... or Video ID"
                         />
                       </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">صورة مصغرة / غلاف للفيديو التعريفي (Poster)</label>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            name="quduratVideoPoster"
+                            defaultValue={platformSettings.quduratVideoPoster || ''}
+                            className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-emerald-500 dark:text-white font-mono text-xs text-left"
+                            dir="ltr"
+                            placeholder="رابط الصورة المصغرة المباشر (https://...)"
+                          />
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors">
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>اختر صورة من جهازك</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) setQuduratVideoPosterFile(e.target.files[0]);
+                                }}
+                              />
+                            </label>
+                            {(quduratVideoPosterFile || platformSettings.quduratVideoPoster) && (
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={quduratVideoPosterFile ? URL.createObjectURL(quduratVideoPosterFile) : platformSettings.quduratVideoPoster}
+                                  alt="Qudurat poster preview"
+                                  className="w-12 h-8 object-cover rounded-md border border-gray-200 dark:border-[#2D2D3D]"
+                                />
+                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                  {quduratVideoPosterFile ? 'تم اختيار صورة جديدة' : 'الغلاف الحالي'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -2459,6 +2525,45 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                           dir="ltr"
                           placeholder="https://www.youtube.com/watch?v=... or Video ID"
                         />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">صورة مصغرة / غلاف للفيديو التعريفي (Poster)</label>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            name="tahsiliVideoPoster"
+                            defaultValue={platformSettings.tahsiliVideoPoster || ''}
+                            className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-purple-500 dark:text-white font-mono text-xs text-left"
+                            dir="ltr"
+                            placeholder="رابط الصورة المصغرة المباشر (https://...)"
+                          />
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors">
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>اختر صورة من جهازك</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) setTahsiliVideoPosterFile(e.target.files[0]);
+                                }}
+                              />
+                            </label>
+                            {(tahsiliVideoPosterFile || platformSettings.tahsiliVideoPoster) && (
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={tahsiliVideoPosterFile ? URL.createObjectURL(tahsiliVideoPosterFile) : platformSettings.tahsiliVideoPoster}
+                                  alt="Tahsili poster preview"
+                                  className="w-12 h-8 object-cover rounded-md border border-gray-200 dark:border-[#2D2D3D]"
+                                />
+                                <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                                  {tahsiliVideoPosterFile ? 'تم اختيار صورة جديدة' : 'الغلاف الحالي'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2532,6 +2637,45 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                           dir="ltr"
                           placeholder="https://www.youtube.com/watch?v=... أو رابط مباشر"
                         />
+                      </div>
+                      <div className="md:col-span-2 mt-2">
+                        <label className="text-xs font-bold text-gray-500 block mb-1">صورة مصغرة / غلاف للفيديو التعريفي الرئيسي (Hero Poster)</label>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            name="heroVideoPoster"
+                            defaultValue={platformSettings.heroVideoPoster || ''}
+                            className="w-full bg-gray-50 dark:bg-[#0D0D12]/40 border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-mono text-xs text-left"
+                            dir="ltr"
+                            placeholder="رابط الصورة المصغرة المباشر (https://...)"
+                          />
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer px-3 py-1.5 bg-[#00B4D8]/10 hover:bg-[#00B4D8]/20 text-[#00B4D8] dark:text-[#D4AF37] rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors">
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>اختر صورة غلاف من جهازك</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) setHeroVideoPosterFile(e.target.files[0]);
+                                }}
+                              />
+                            </label>
+                            {(heroVideoPosterFile || platformSettings.heroVideoPoster) && (
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={heroVideoPosterFile ? URL.createObjectURL(heroVideoPosterFile) : platformSettings.heroVideoPoster}
+                                  alt="Hero poster preview"
+                                  className="w-12 h-8 object-cover rounded-md border border-gray-200 dark:border-[#2D2D3D]"
+                                />
+                                <span className="text-[10px] text-[#00B4D8] dark:text-[#D4AF37] font-bold">
+                                  {heroVideoPosterFile ? 'تم اختيار صورة جديدة' : 'الغلاف الحالي'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

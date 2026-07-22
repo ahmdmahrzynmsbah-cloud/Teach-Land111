@@ -2068,16 +2068,22 @@ export default function Dashboard() {
         <div className="p-6 md:p-8 flex-1 pb-24 md:pb-8">
           <AnimatePresence mode="wait">
             {activeTab === 'admin' && userData?.role === 'admin' && (
-              <AdminPanel userData={userData} />
+              <motion.div key="admin" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <AdminPanel userData={userData} />
+              </motion.div>
             )}
             {activeTab === 'admin_recharge' && userData?.role === 'admin' && (
-              <AdminPanel initialTab="wallet" userData={userData} />
+              <motion.div key="admin_recharge" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <AdminPanel initialTab="wallet" userData={userData} />
+              </motion.div>
             )}
             {activeTab === 'admin_courses' && userData?.role === 'admin' && (
-              <AdminCoursesPanel />
+              <motion.div key="admin_courses" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <AdminCoursesPanel />
+              </motion.div>
             )}
             {activeTab === 'home' && userData?.role === 'admin' && (
-              <div className="space-y-6">
+              <motion.div key="home_admin" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 <div className="bg-gradient-to-br from-[#00B4D8] to-blue-600 dark:from-[#D4AF37] dark:to-yellow-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
                   <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
@@ -2128,7 +2134,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-                  <button onClick={() => setActiveTab('admin_panel')} className="p-6 bg-white dark:bg-[#15151F] border border-gray-100 dark:border-[#2D2D3D] rounded-3xl hover:border-[#00B4D8] dark:hover:border-[#D4AF37] transition-all flex items-center justify-between group">
+                  <button onClick={() => setActiveTab('admin')} className="p-6 bg-white dark:bg-[#15151F] border border-gray-100 dark:border-[#2D2D3D] rounded-3xl hover:border-[#00B4D8] dark:hover:border-[#D4AF37] transition-all flex items-center justify-between group">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-gray-50 dark:bg-[#20202D] rounded-xl flex items-center justify-center group-hover:bg-[#00B4D8]/10 dark:group-hover:bg-[#D4AF37]/10 transition-colors">
                         <Shield className="w-6 h-6 text-gray-400 group-hover:text-[#00B4D8] dark:group-hover:text-[#D4AF37]" />
@@ -2162,7 +2168,7 @@ export default function Dashboard() {
                     </div>
                   </button>
                 </div>
-              </div>
+              </motion.div>
             )}
             {activeTab === 'home' && userData?.role !== 'admin' && (
               <motion.div

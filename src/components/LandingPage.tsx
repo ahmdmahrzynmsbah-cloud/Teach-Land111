@@ -82,7 +82,7 @@ export default function LandingPage() {
   const [isHeroVideoPlayingInline, setIsHeroVideoPlayingInline] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
-  const renderHeroVideo = (url: string, provider?: string, title?: string) => {
+  const renderHeroVideo = (url: string, provider?: string, title?: string, poster?: string) => {
     if (!url) return null;
 
     if (provider === 'bunny' || (!url.includes('http') && !url.includes('youtube') && !url.includes('tiktok'))) {
@@ -97,6 +97,7 @@ export default function LandingPage() {
       return (
         <video
           src={url}
+          poster={poster}
           controls
           autoPlay
           className="w-full h-full object-cover rounded-xl"
@@ -106,14 +107,11 @@ export default function LandingPage() {
       );
     }
 
-    const embedUrl = getYoutubeEmbedUrl(url);
     return (
-      <iframe
-        src={embedUrl + (embedUrl.includes('?') ? '&autoplay=1' : '?autoplay=1')}
-        className="w-full h-full object-cover rounded-xl border-0"
-        title={title || 'Hero Video'}
-        allowFullScreen
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      <CleanYoutubePlayer
+        videoUrl={url}
+        title={title}
+        poster={poster}
       />
     );
   };
@@ -356,7 +354,7 @@ export default function LandingPage() {
                       {/* Video Container */}
                       <div className="w-full aspect-video bg-gray-950 rounded-xl relative flex items-center justify-center overflow-hidden shadow-inner group border border-gray-800">
                          {settings.heroVideoUrl && isHeroVideoPlayingInline ? (
-                            renderHeroVideo(settings.heroVideoUrl, settings.heroVideoProvider, settings.heroVideoTitle)
+                            renderHeroVideo(settings.heroVideoUrl, settings.heroVideoProvider, settings.heroVideoTitle, settings.heroVideoPoster)
                          ) : (
                             <div 
                                onClick={() => {
@@ -366,12 +364,20 @@ export default function LandingPage() {
                                      setIsHeroVideoModalOpen(true);
                                   }
                                }}
-                               className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white p-4 cursor-pointer group hover:scale-[1.02] transition-all duration-300"
+                               className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white p-4 cursor-pointer group hover:scale-[1.02] transition-all duration-300 overflow-hidden"
                             >
-                               <div className="w-14 h-14 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-full flex items-center justify-center shadow-lg shadow-[#00B4D8]/40 dark:shadow-[#D4AF37]/40 group-hover:scale-110 transition-all duration-300">
+                               {settings.heroVideoPoster && (
+                                  <img 
+                                     src={settings.heroVideoPoster} 
+                                     alt={settings.heroVideoTitle || "Hero Poster"} 
+                                     className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-95 group-hover:scale-105 transition-all duration-500" 
+                                  />
+                               )}
+                               <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
+                               <div className="relative z-10 w-14 h-14 bg-[#00B4D8] dark:bg-[#D4AF37] rounded-full flex items-center justify-center shadow-lg shadow-[#00B4D8]/40 dark:shadow-[#D4AF37]/40 group-hover:scale-110 transition-all duration-300">
                                   <Play className="w-6 h-6 text-white ml-1 fill-white" />
                                </div>
-                               <span className="text-xs font-bold text-gray-200 mt-3 group-hover:text-white transition-colors">
+                               <span className="relative z-10 text-xs font-bold text-gray-200 mt-3 group-hover:text-white transition-colors bg-black/60 px-3 py-1 rounded-full backdrop-blur-md">
                                   {settings.heroVideoUrl ? 'اضغط لمشاهدة الفيديو التعريفي 🎬' : 'معاينة المنصة'}
                                </span>
                             </div>
@@ -655,6 +661,7 @@ export default function LandingPage() {
                   <CleanYoutubePlayer 
                     videoUrl={settings.quduratVideoUrl} 
                     title={settings.quduratVideoTitle} 
+                    poster={settings.quduratVideoPoster}
                   />
                 )}
                 {settings.quduratVideoProvider === 'tiktok' && (
@@ -666,6 +673,7 @@ export default function LandingPage() {
                 {settings.quduratVideoProvider === 'direct' && (
                   <video 
                     src={settings.quduratVideoUrl} 
+                    poster={settings.quduratVideoPoster}
                     controls 
                     className="absolute inset-0 w-full h-full object-cover"
                   />
@@ -769,6 +777,7 @@ export default function LandingPage() {
                   <CleanYoutubePlayer 
                     videoUrl={settings.tahsiliVideoUrl} 
                     title={settings.tahsiliVideoTitle} 
+                    poster={settings.tahsiliVideoPoster}
                   />
                 )}
                 {settings.tahsiliVideoProvider === 'tiktok' && (
@@ -780,6 +789,7 @@ export default function LandingPage() {
                 {settings.tahsiliVideoProvider === 'direct' && (
                   <video 
                     src={settings.tahsiliVideoUrl} 
+                    poster={settings.tahsiliVideoPoster}
                     controls 
                     className="absolute inset-0 w-full h-full object-cover"
                   />
