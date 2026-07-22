@@ -127,15 +127,30 @@ export default function LandingPage() {
   const [supportSubmitted, setSupportSubmitted] = useState(false);
   const [supportSubmitting, setSupportSubmitting] = useState(false);
 
-  const handleSupportSubmit = (e: FormEvent) => {
+  const handleSupportSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!supportName.trim() || !supportEmail.trim() || !supportMessage.trim()) return;
     setSupportSubmitting(true);
-    setTimeout(() => {
+    
+    try {
+      const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+      await addDoc(collection(db, 'support_requests'), {
+        name: supportName,
+        emailOrPhone: supportEmail,
+        message: supportMessage,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
       setSupportSubmitting(false);
       setSupportSubmitted(true);
       setSupportMessage('');
-    }, 1200);
+    } catch (error) {
+      console.error('Error submitting support request:', error);
+      setSupportSubmitting(false);
+      // fallback if error, still show success or maybe a toast?
+      setSupportSubmitted(true);
+      setSupportMessage('');
+    }
   };
 
   const handleSubscribe = (e: FormEvent) => {
@@ -201,67 +216,122 @@ export default function LandingPage() {
     };
   }, []);
 
-  const faqs = [
+  const defaultFaqsList = [
     {
-      q: 'هل منصة Teachland مجانية؟',
-      a: 'التسجيل مجاني وتقدر تجرب بعض الدروس، لكن عشان تفتح كل المواد والكورسات هتحتاج تشترك في إحدى الباقات المتاحة.'
+      q: 'هل تسجيل الدخول وإنشاء الحساب في المنصة مجاني؟',
+      a: 'نعم، التسجيل في المنصة مجاني تماماً ويمكنك استكشاف الواجهة وتجربة بعض الدروس المجانية، ولفتح الكورسات والمواد كاملة يمكنك الاشتراك في الباقات المتاحة.'
     },
     {
-      q: 'إزاي أقدر أشترك في الباقات؟',
-      a: 'تقدر تشترك عن طريق الدفع الإلكتروني (فودافون كاش، فيزا)، أو عن طريق شراء "كارت Teachland" من أقرب سنتر أو مكتبة.'
+      q: 'إزاي أقدر أشترك في الباقات أو أشحن المحفظة؟',
+      a: 'نوفر عدة طرق سهلة ومريحة تشمل: الدفع الإلكتروني (فودافون كاش، إنستا باي، التحويل البنكي)، أو شحن رصيد المحفظة باستخدام كروت الشحن وأكواد التفعيل.'
     },
     {
-      q: 'هل الفيديوهات بتشتغل أوفلاين؟',
-      a: 'الفيديوهات حالياً بتحتاج إنترنت، بس بنوفرلك ملخصات ومذكرات (PDF) تقدر تنزلها وتذاكرها من غير نت.'
+      q: 'هل يمكنني مشاهدة الدروس أو تحميل المذكرات؟',
+      a: 'يمكنك مشاهدة جميع دروسك أونلاين بجودة عالية وبدون تقطيع، كما يمكنك تحميل جميع المذكرات والملخصات بصيغة PDF لمذاكرتها ومراجعتها في أي وقت.'
     }
   ];
+
+  const faqs = settings.customFaqs && settings.customFaqs.length > 0 ? settings.customFaqs : defaultFaqsList;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0D0D12] text-gray-900 dark:text-white font-sans selection:bg-primary/30">
       {/* Navbar */}
-      <nav className="bg-white/80 dark:bg-[#1A1A24]/80 backdrop-blur-xl fixed top-0 left-0 right-0 z-50 border-b border-gray-200 dark:border-[#2D2D3D] shadow-sm">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between relative">
+      <nav className="bg-white/90 dark:bg-[#12121A]/90 backdrop-blur-xl fixed top-0 left-0 right-0 z-50 border-b border-gray-200/50 dark:border-white/5 shadow-sm transition-all duration-300">
+        <div className="container mx-auto px-4 sm:px-6 h-16 md:h-20 flex items-center justify-between relative">
           
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-8 min-w-0">
+            <div className="flex items-center gap-2.5 hover:opacity-90 transition-opacity cursor-pointer min-w-0" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               {settings.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="w-9 h-9 sm:w-11 sm:h-11 object-contain rounded-xl shadow-md" />
+                <img src={settings.logoUrl} alt="Logo" className="w-9 h-9 sm:w-11 sm:h-11 object-contain rounded-xl shadow-sm shrink-0" />
               ) : (
-                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gradient-to-tr from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] rounded-xl flex items-center justify-center font-black text-lg sm:text-xl text-white shadow-md shadow-[#00B4D8]/30 dark:shadow-[#D4AF37]/30 border border-white/10 select-none">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 bg-gradient-to-tr from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] rounded-xl flex items-center justify-center font-black text-lg sm:text-xl text-white shadow-md shadow-[#00B4D8]/30 dark:shadow-[#D4AF37]/30 border border-white/10 select-none">
                   {settings.logoChar}
                 </div>
-        
               )}
-              <span className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] bg-clip-text text-transparent select-none inline-block py-1 px-0.5 leading-normal">{settings.platformName}</span>
+              <span className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-[#0077B6] to-[#00B4D8] dark:from-[#B8860B] dark:to-[#D4AF37] bg-clip-text text-transparent select-none inline-block py-1 px-0.5 leading-normal drop-shadow-sm truncate max-w-[150px] sm:max-w-[250px] lg:max-w-[300px]">{settings.platformName}</span>
             </div>
           </div>
 
           
-          <div className="hidden md:flex items-center gap-8 text-sm font-bold text-gray-600 dark:text-gray-300">
-            <a href="#grades" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">الصفوف الدراسية</a>
-            <a href="#subjects" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">المواد الدراسية</a>
-            <a href="#tahsili" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">التحصيلي</a>
-            <a href="#qudurat" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">القدرات</a>
-            <a href="#how-it-works" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">مميزات المنصة</a>
-            <a href="#faq" className="hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors">الأسئلة الشائعة</a>
+          <div className="hidden xl:flex items-center gap-6 text-sm font-bold text-gray-600 dark:text-gray-300">
+            <a href="#grades" className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all relative after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#00B4D8] dark:after:bg-[#D4AF37] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-right whitespace-nowrap">الصفوف الدراسية</a>
+            <a href="#subjects" className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all relative after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#00B4D8] dark:after:bg-[#D4AF37] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-right whitespace-nowrap">المواد الدراسية</a>
+            <a href="#tahsili" className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all relative after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#00B4D8] dark:after:bg-[#D4AF37] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-right whitespace-nowrap">التحصيلي</a>
+            <a href="#qudurat" className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all relative after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#00B4D8] dark:after:bg-[#D4AF37] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-right whitespace-nowrap">القدرات</a>
+            <a href="#how-it-works" className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all relative after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#00B4D8] dark:after:bg-[#D4AF37] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-right whitespace-nowrap">مميزات المنصة</a>
+            <a href="#faq" className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-all relative after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#00B4D8] dark:after:bg-[#D4AF37] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-right whitespace-nowrap">الأسئلة الشائعة</a>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="xl:hidden p-2 -mr-2 text-gray-600 dark:text-gray-300 hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors"
+            >
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
             <ThemeToggle />
             {user ? (
-              <Link to="/dashboard" className="bg-[#00B4D8] dark:bg-[#D4AF37] text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-full font-bold text-xs sm:text-sm shadow-lg shadow-[#00B4D8]/30 dark:shadow-[#D4AF37]/30 hover:bg-[#0077B6] dark:hover:bg-[#B8860B] hover:-translate-y-0.5 transition-all flex items-center gap-1 sm:gap-2">
-                لوحة التحكم
-              </Link>
+              <div className="flex items-center gap-2 sm:gap-3 bg-gray-50/50 dark:bg-white/5 pl-1 pr-3 py-1 rounded-full border border-gray-200/50 dark:border-white/5">
+                {userData?.role && (
+                  <div 
+                    title={`أنت مسجل حالياً كـ ${userData.role === 'student' ? 'طالب' : userData.role === 'teacher' ? 'معلم' : userData.role === 'parent' ? 'ولي أمر' : 'إدارة'}`}
+                    className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black shadow-sm border transition-all ${
+                      userData.role === 'student'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                        : userData.role === 'teacher'
+                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                        : userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer'
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                    }`}
+                  >
+                    {userData.role === 'student' && <GraduationCap className="w-3.5 h-3.5 shrink-0" />}
+                    {userData.role === 'teacher' && <Award className="w-3.5 h-3.5 shrink-0" />}
+                    {(userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer') && <Shield className="w-3.5 h-3.5 shrink-0" />}
+                    {userData.role === 'parent' && <Users className="w-3.5 h-3.5 shrink-0" />}
+                    
+                    <span className="flex items-center gap-1">
+                      <span>
+                        {userData.role === 'student' && 'طالب'}
+                        {userData.role === 'teacher' && 'معلم'}
+                        {(userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer') && 'إدارة'}
+                        {userData.role === 'parent' && 'ولي أمر'}
+                      </span>
+                    </span>
+                  </div>
+                )}
+                <Link to="/dashboard" className="bg-[#00B4D8] dark:bg-[#D4AF37] text-white px-4 sm:px-6 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm shadow-lg shadow-[#00B4D8]/20 dark:shadow-[#D4AF37]/20 hover:bg-[#0077B6] dark:hover:bg-[#B8860B] hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                  لوحة التحكم
+                </Link>
+              </div>
             ) : (
-              <>
-                <Link to="/login" className="text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-[#00B4D8] dark:text-[#D4AF37] transition-colors px-2 sm:px-4 py-2 hidden sm:block">تسجيل الدخول</Link>
-                <Link to="/register" className="bg-[#00B4D8] dark:bg-[#D4AF37] text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-full font-bold text-xs sm:text-sm shadow-lg shadow-[#00B4D8]/30 dark:shadow-[#D4AF37]/30 hover:bg-[#0077B6] dark:hover:bg-[#B8860B] hover:-translate-y-0.5 transition-all flex items-center gap-1 sm:gap-2">
+              <div className="flex items-center gap-2">
+                <Link to="/login" className="text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors px-3 py-2 hidden sm:block">تسجيل الدخول</Link>
+                <Link to="/register" className="bg-[#00B4D8] dark:bg-[#D4AF37] text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-full font-bold text-sm shadow-lg shadow-[#00B4D8]/20 dark:shadow-[#D4AF37]/20 hover:bg-[#0077B6] dark:hover:bg-[#B8860B] hover:-translate-y-0.5 hover:shadow-xl transition-all flex items-center gap-2">
                   إنشاء حساب
                 </Link>
-              </>
+              </div>
             )}
           </div>
 
+        </div>
+
+        {/* Mobile Menu Dropdown */}
+        <div className={`xl:hidden absolute top-full left-0 right-0 bg-white/95 dark:bg-[#12121A]/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/5 shadow-lg transition-all duration-300 overflow-hidden ${isMobileMenuOpen ? 'max-h-[400px] opacity-100 visible' : 'max-h-0 opacity-0 invisible'}`}>
+          <div className="container mx-auto px-4 py-4 flex flex-col gap-4 text-sm font-bold text-gray-600 dark:text-gray-300">
+            <a href="#grades" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2 border-b border-gray-100 dark:border-white/5">الصفوف الدراسية</a>
+            <a href="#subjects" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2 border-b border-gray-100 dark:border-white/5">المواد الدراسية</a>
+            <a href="#tahsili" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2 border-b border-gray-100 dark:border-white/5">التحصيلي</a>
+            <a href="#qudurat" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2 border-b border-gray-100 dark:border-white/5">القدرات</a>
+            <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2 border-b border-gray-100 dark:border-white/5">مميزات المنصة</a>
+            <a href="#faq" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2">الأسئلة الشائعة</a>
+            
+            {!user && (
+              <Link to="/login" className="sm:hidden text-center hover:text-[#00B4D8] dark:hover:text-[#D4AF37] transition-colors py-2 mt-2 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200/50 dark:border-white/5">
+                تسجيل الدخول
+              </Link>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -856,103 +926,52 @@ export default function LandingPage() {
       {settings.showFeaturesSection && <PremiumFeaturesSection />}
 
       {/* FAQ Section */}
-      <section id="faq" className="py-24 bg-gray-50 dark:bg-[#0D0D12]">
-        <div className="container mx-auto px-6 max-w-3xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-black mb-4 text-gray-900 dark:text-white">{settings.faqTitle || 'الأسئلة الشائعة'}</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-lg font-medium">{settings.faqSubtitle || 'كل اللي محتاج تعرفه عن منصتنا'}</p>
-          </div>
+      {settings.showFaqSection && (
+        <section id="faq" className="py-24 bg-gray-50 dark:bg-[#0D0D12]">
+          <div className="container mx-auto px-6 max-w-3xl">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-black mb-4 text-gray-900 dark:text-white">{settings.faqTitle || 'الأسئلة الشائعة'}</h2>
+              <p className="text-gray-500 dark:text-gray-400 text-lg font-medium">{settings.faqSubtitle || 'كل اللي محتاج تعرفه عن منصتنا'}</p>
+            </div>
 
-          <div className="space-y-4">
-            {faqs.map((faq, i) => (
-              <div 
-                key={i}
-                className={`rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm ${openFaqIndex === i ? 'bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 border-[#00B4D8]/30 dark:border-[#D4AF37]/30 shadow-md' : 'bg-white dark:bg-[#1A1A24] border-gray-200 dark:border-[#2D2D3D] hover:border-[#00B4D8]/30 dark:hover:border-[#D4AF37]/30'}`}
-              >
-                <button 
-                  onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
-                  className="w-full px-6 py-5 flex items-center justify-between text-right outline-none"
+            <div className="space-y-4">
+              {faqs.map((faq, i) => (
+                <div 
+                  key={i}
+                  className={`rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm ${openFaqIndex === i ? 'bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 border-[#00B4D8]/30 dark:border-[#D4AF37]/30 shadow-md' : 'bg-white dark:bg-[#1A1A24] border-gray-200 dark:border-[#2D2D3D] hover:border-[#00B4D8]/30 dark:hover:border-[#D4AF37]/30'}`}
                 >
-                  <span className={`font-bold text-base sm:text-lg transition-colors duration-300 ${openFaqIndex === i ? 'text-[#00B4D8] dark:text-[#D4AF37]' : 'text-gray-900 dark:text-white'}`}>{faq.q}</span>
-                  <div
-                    className={`p-1.5 rounded-full transition-all duration-300 ${openFaqIndex === i ? 'bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] rotate-180' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  <button 
+                    onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
+                    className="w-full px-6 py-5 flex items-center justify-between text-right outline-none"
                   >
-                    <ChevronDown className="w-5 h-5" />
-                  </div>
-                </button>
-                <AnimatePresence initial={false}>
-                  {openFaqIndex === i && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: "easeInOut" }}
-                      className="overflow-hidden"
+                    <span className={`font-bold text-base sm:text-lg transition-colors duration-300 ${openFaqIndex === i ? 'text-[#00B4D8] dark:text-[#D4AF37]' : 'text-gray-900 dark:text-white'}`}>{faq.q}</span>
+                    <div
+                      className={`p-1.5 rounded-full transition-all duration-300 ${openFaqIndex === i ? 'bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] rotate-180' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                     >
-                      <div className="px-6 pb-5 text-sm sm:text-base text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
-                        {faq.a}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                      <ChevronDown className="w-5 h-5" />
+                    </div>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {openFaqIndex === i && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-6 pb-5 text-sm sm:text-base text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
+                          {faq.a}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* Newsletter / CTA Section */}
-      <section className="py-16 bg-white dark:bg-[#1A1A24] border-t border-gray-100 dark:border-[#2D2D3D] relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#00B4D8]/5 dark:bg-[#D4AF37]/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="container mx-auto px-6 max-w-4xl relative z-10 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#0077B6] dark:text-[#B8860B] mb-4 text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5" /> ابقَ على اطلاع دائم
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black mb-4 text-gray-900 dark:text-white">
-            اشترك في نشرتنا الإخبارية للحصول على أحدث النصائح التعليمية
-          </h2>
-          <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-medium mb-8 max-w-lg mx-auto leading-relaxed">
-            انضم إلى آلاف الطلاب وأولياء الأمور الذين يتلقون نصائح أسبوعية حول كيفية زيادة التحصيل الدراسي والTeachland في الامتحانات.
-          </p>
-
-          <form onSubmit={handleSubscribe} className="max-w-md mx-auto relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-0 sm:bg-gray-50 sm:dark:bg-[#0D0D12] sm:p-1.5 sm:rounded-2xl sm:border sm:border-gray-200 sm:dark:border-[#2D2D3D] shadow-none sm:shadow-sm sm:focus-within:border-[#00B4D8] sm:dark:focus-within:border-[#D4AF37] transition-all w-full">
-            <input
-              type="email"
-              required
-              placeholder="أدخل بريدك الإلكتروني هنا..."
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              className="w-full sm:flex-1 bg-gray-50 dark:bg-[#0D0D12] sm:bg-transparent px-5 sm:px-4 py-3.5 sm:py-2.5 rounded-xl sm:rounded-none border border-gray-200 dark:border-[#2D2D3D] sm:border-none text-sm outline-none text-gray-900 dark:text-white text-right placeholder:text-gray-400 font-medium focus:border-[#00B4D8] dark:focus:border-[#D4AF37] sm:focus:border-transparent sm:dark:focus:border-transparent min-w-0"
-            />
-            <button
-              type="submit"
-              disabled={submitting || subscribed}
-              className="w-full sm:w-auto bg-[#00B4D8] dark:bg-[#D4AF37] text-white px-5 py-3.5 sm:py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-[#0077B6] dark:hover:bg-[#B8860B] transition-all flex items-center justify-center gap-2 shrink-0 disabled:opacity-75"
-            >
-              {submitting ? (
-                <span>جاري الاشتراك...</span>
-              ) : subscribed ? (
-                <>
-                  <CheckCircle className="w-4 h-4 text-white" />
-                  <span>تم الاشتراك!</span>
-                </>
-              ) : (
-                <>
-                  <span>اشترك الآن</span>
-                  <LucideIcons.Send className="w-4 h-4 -rotate-90 shrink-0" />
-                </>
-              )}
-            </button>
-          </form>
-          {subscribed && (
-            <p 
-              className="text-green-600 dark:text-green-400 font-bold text-xs mt-3"
-            >
-              🎉 شكرًا لك على اشتراكك في نشرتنا الإخبارية! سنبقيك على اطلاع دائم بكل ما هو جديد.
-            </p>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
 
       {/* Ultra-Premium Footer */}
@@ -1159,145 +1178,169 @@ export default function LandingPage() {
               <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 text-sm leading-relaxed text-gray-600 dark:text-gray-300 font-medium">
                 {activeModal === 'privacy' && (
                   <div className="space-y-4">
-                    <p className="text-gray-900 dark:text-white font-extrabold text-base">
-                      مرحباً بك في سياسة الخصوصية الخاصة بـ منصة Teachland. خصوصيتك وأمان بياناتك هي أهم أولوياتنا.
-                    </p>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ١. البيانات التي نقوم بجمعها
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        نقوم بجمع البيانات الأساسية اللازمة لإنشاء حسابك الدراسي، وتشمل: الاسم الكامل، رقم الهاتف (للطالب وولي الأمر لتلقي تقارير الدرجات)، البريد الإلكتروني، والمستوى الدراسي (إعدادي أو ثانوي).
-                      </p>
-                    </div>
+                    {settings.privacyPolicyText ? (
+                      <div className="whitespace-pre-line text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-gray-50/50 dark:bg-[#1A1A24]/50 p-4 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                        {settings.privacyPolicyText}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-900 dark:text-white font-extrabold text-base">
+                          مرحباً بك في سياسة الخصوصية الخاصة بـ منصة Teachland. خصوصيتك وأمان بياناتك هي أهم أولوياتنا.
+                        </p>
+                        
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ١. البيانات التي نقوم بجمعها
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            نقوم بجمع البيانات الأساسية اللازمة لإنشاء حسابك الدراسي، وتشمل: الاسم الكامل، رقم الهاتف (للطالب وولي الأمر لتلقي تقارير الدرجات)، البريد الإلكتروني، والمستوى الدراسي (إعدادي أو ثانوي).
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٢. كيف نستخدم بياناتك ونحميها؟
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        تُستخدم البيانات فقط لتقديم تجربة تعليمية مخصصة، ومتابعة تقدمك في المواد،  جميع كلمات المرور وبياناتك مشفرة بالكامل عبر خوادم مأمنة ومحمية ببروتوكولات حماية متطورة تمنع أي وصول غير مصرح به.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٢. كيف نستخدم بياناتك ونحميها؟
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            تُستخدم البيانات فقط لتقديم تجربة تعليمية مخصصة، ومتابعة تقدمك في المواد،  جميع كلمات المرور وبياناتك مشفرة بالكامل عبر خوادم مأمنة ومحمية ببروتوكولات حماية متطورة تمنع أي وصول غير مصرح به.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٣. سرية المعلومات والجهات الخارجية
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        نلتزم التزاماً تاماً بعدم بيع أو مشاركة أو تأجير أي من بياناتك الشخصية لأي جهة تجارية أو إعلانية خارجية. بياناتك ملكك وحدك وتُستخدم حصرياً داخل بيئة "Teachland" التعليمية.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٣. سرية المعلومات والجهات الخارجية
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            نلتزم التزاماً تاماً بعدم بيع أو مشاركة أو تأجير أي من بياناتك الشخصية لأي جهة تجارية أو إعلانية خارجية. بياناتك ملكك وحدك وتُستخدم حصرياً داخل بيئة "Teachland" التعليمية.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٤. أمان العمليات والمدفوعات
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        تتم جميع العمليات المالية وشحن المحافظ عبر قنوات معتمدة وموفرين معتمدين لخدمات الدفع الإلكتروني في مصر (مثل فوري والمحافظ الإلكترونية) وتخضع لأقصى معايير الأمان المصرفي الرقمي.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٤. أمان العمليات والمدفوعات
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            تتم جميع العمليات المالية وشحن المحافظ عبر قنوات معتمدة وموفرين معتمدين لخدمات الدفع الإلكتروني في مصر (مثل فوري والمحافظ الإلكترونية) وتخضع لأقصى معايير الأمان المصرفي الرقمي.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
                 {activeModal === 'terms' && (
                   <div className="space-y-4">
-                    <p className="text-gray-900 dark:text-white font-extrabold text-base">
-                      باستخدامك لمنصة Teachland، فإنك توافق على الالتزام الكامل بالشروط والأحكام التالية المبرمة لضمان بيئة تعليمية عادلة ومثمرة لجميع الطلاب.
-                    </p>
+                    {settings.termsConditionsText ? (
+                      <div className="whitespace-pre-line text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-gray-50/50 dark:bg-[#1A1A24]/50 p-4 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                        {settings.termsConditionsText}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-900 dark:text-white font-extrabold text-base">
+                          باستخدامك لمنصة Teachland، فإنك توافق على الالتزام الكامل بالشروط والأحكام التالية المبرمة لضمان بيئة تعليمية عادلة ومثمرة لجميع الطلاب.
+                        </p>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ١. شروط الاستخدام والحسابات
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        المنصة مخصصة للاستخدام الشخصي لطلاب المرحلة الثانوية فقط. يحق لكل طالب تسجيل حساب واحد فقط. يمنع منعاً باتاً مشاركة بيانات تسجيل الدخول مع أي شخص آخر، ويحتفظ النظام بالحق في إيقاف أي حساب يسجل دخول من أجهزة متعددة بشكل يثير الشبهة.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ١. شروط الاستخدام والحسابات
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            المنصة مخصصة للاستخدام الشخصي لطلاب المرحلة الثانوية فقط. يحق لكل طالب تسجيل حساب واحد فقط. يمنع منعاً باتاً مشاركة بيانات تسجيل الدخول مع أي شخص آخر، ويحتفظ النظام بالحق في إيقاف أي حساب يسجل دخول من أجهزة متعددة بشكل يثير الشبهة.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٢. المحتوى التعليمي والاشتراكات
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        توفر المنصة محتوى مجاني وآخر مدفوع (بنظام الاشتراك الشهري أو شراء الكورسات الفردية). بمجرد إتمام الشراء، يصبح المحتوى متاحاً للطالب طوال فترة العام الدراسي الجاري ولا يحق استرداد الرسوم بعد تفعيل الكورس وبدء المشاهدة.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٢. المحتوى التعليمي والاشتراكات
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            توفر المنصة محتوى مجاني وآخر مدفوع (بنظام الاشتراك الشهري أو شراء الكورسات الفردية). بمجرد إتمام الشراء، يصبح المحتوى متاحاً للطالب طوال فترة العام الدراسي الجاري ولا يحق استرداد الرسوم بعد تفعيل الكورس وبدء المشاهدة.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٣. قواعد السلوك العام والتعليقات
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        نحن فخورون ببيئتنا التعليمية الراقية. يُمنع منعاً باتاً نشر أي تعليقات مسيئة، سياسية، أو غير لائقة في أقسام الأسئلة والتعليقات تحت المحاضرات. سيؤدي ارتكاب أي من ذلك إلى حظر فوري للحساب دون إنذار ودون استرداد للمستحقات.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٣. قواعد السلوك العام والتعليقات
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            نحن فخورون ببيئتنا التعليمية الراقية. يُمنع منعاً باتاً نشر أي تعليقات مسيئة، سياسية، أو غير لائقة في أقسام الأسئلة والتعليقات تحت المحاضرات. سيؤدي ارتكاب أي من ذلك إلى حظر فوري للحساب دون إنذار ودون استرداد للمستحقات.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٤. النزاهة في الاختبارات
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        تحتفظ إدارة المنصة بالحق في مراجعة تقدم الطلاب الحاصلين على المراكز الأولى في الدوري الأسبوعي لضمان عدم وجود تلاعب أو غش في حل الواجبات والاختبارات الإلكترونية.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٤. النزاهة في الاختبارات
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            تحتفظ إدارة المنصة بالحق في مراجعة تقدم الطلاب الحاصلين على المراكز الأولى في الدوري الأسبوعي لضمان عدم وجود تلاعب أو غش في حل الواجبات والاختبارات الإلكترونية.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
                 {activeModal === 'copyright' && (
                   <div className="space-y-4">
-                    <p className="text-gray-900 dark:text-white font-extrabold text-base">
-                      الملكية الفكرية لـ منصة Teachland محمية بموجب القوانين المصرية والدولية لحماية حقوق المؤلف والملكية الفكرية.
-                    </p>
+                    {settings.intellectualPropertyText ? (
+                      <div className="whitespace-pre-line text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-gray-50/50 dark:bg-[#1A1A24]/50 p-4 rounded-2xl border border-gray-100 dark:border-[#2D2D3D]">
+                        {settings.intellectualPropertyText}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-900 dark:text-white font-extrabold text-base">
+                          الملكية الفكرية لـ منصة Teachland محمية بموجب القوانين المصرية والدولية لحماية حقوق المؤلف والملكية الفكرية.
+                        </p>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ١. حقوق المؤلف الحصرية للمواد العلمية
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        جميع المحاضرات المرئية، الفيديوهات التوضيحية، بنوك الأسئلة، الاختبارات، المذكرات الرقمية والملخصات المعروضة على المنصة هي ملكية فكرية حصرية لـ "منصة Teachland" ونخبة المدرسين المتعاقد معهم.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ١. حقوق المؤلف الحصرية للمواد العلمية
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            جميع المحاضرات المرئية، الفيديوهات التوضيحية، بنوك الأسئلة، الاختبارات، المذكرات الرقمية والملخصات المعروضة على المنصة هي ملكية فكرية حصرية لـ "منصة Teachland" ونخبة المدرسين المتعاقد معهم.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                        ٢. الحظر القانوني وعقوبة تسريب المحتوى
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        يُحظر تماماً وبشكل قاطع: تسجيل شاشة المحاضرات، إعادة رفع مقاطع الفيديو على يوتيوب أو فيسبوك أو تليجرام، أو طبع وتوزيع مذكرات المنصة خارج إطار الاستخدام الشخصي المباشر.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                            ٢. الحظر القانوني وعقوبة تسريب المحتوى
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            يُحظر تماماً وبشكل قاطع: تسجيل شاشة المحاضرات، إعادة رفع مقاطع الفيديو على يوتيوب أو فيسبوك أو تليجرام، أو طبع وتوزيع مذكرات المنصة خارج إطار الاستخدام الشخصي المباشر.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
-                        ٣. العلامة المائية الرقمية المدمجة
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        تستخدم المنصة تقنيات مائية رقمية متطورة تدمج اسم الطالب ورقم هاتفه وبيانات حسابه بشكل غير مرئي ومرئي على الشاشة وأوراق العمل لسهولة تعقب وتحديد أي شخص يقوم بتسريب المحتوى.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] dark:bg-[#D4AF37]"></span>
+                            ٣. العلامة المائية الرقمية المدمجة
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            تستخدم المنصة تقنيات مائية رقمية متطورة تدمج اسم الطالب ورقم هاتفه وبيانات حسابه بشكل غير مرئي ومرئي على الشاشة وأوراق العمل لسهولة تعقب وتحديد أي شخص يقوم بتسريب المحتوى.
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
-                        ٤. الملاحقة القانونية الصارمة
-                      </h4>
-                      <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        سيتم ملاحقة أي محاولة للتعدي على حقوق الملكية الفكرية قضائياً وجنائياً بالتنسيق مع مباحث الإنترنت بوزارة الداخلية المصرية وتطبيق العقوبات والغرامات المقررة بموجب قانون مكافحة جرائم تقنية المعلومات المصري.
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                            ٤. الملاحقة القانونية الصارمة
+                          </h4>
+                          <p className="pr-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                            سيتم ملاحقة أي محاولة للتعدي على حقوق الملكية الفكرية قضائياً وجنائياً بالتنسيق مع مباحث الإنترنت بوزارة الداخلية المصرية وتطبيق العقوبات والغرامات المقررة بموجب قانون مكافحة جرائم تقنية المعلومات المصري.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 

@@ -210,5 +210,18 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
+
+    // 26. Chat Messages collection
+    // 27. Support Requests
+    match /support_requests/{requestId} {
+      allow read: if isAdmin();
+      allow write: if true;
+    }
+
+    match /chat_messages/{messageId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }
+

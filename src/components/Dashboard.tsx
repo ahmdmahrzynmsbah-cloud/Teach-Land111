@@ -1,7 +1,7 @@
 import React from "react";
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, ShoppingBag, HelpCircle, Lock, BookOpen, Star, MessageCircleQuestion, CheckCircle, Ticket, LogOut, Trophy, Flame, Bell, Target, ArrowLeft, Video, Bot, Users, Activity, User as UserIcon, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, CreditCard, PiggyBank, RefreshCw, Send, Sparkles, Loader2, DollarSign, Check, History, Award, Edit2, Edit3, Save, X, Clock, Trash2, Plus , Shield, Info, Menu, ChevronRight, ChevronLeft, Film, FileText, Copy, Search } from 'lucide-react';
+import { Play, ShoppingBag, HelpCircle, Lock, BookOpen, Star, MessageCircleQuestion, MessageSquare, CheckCircle, Ticket, LogOut, Trophy, Flame, Bell, Target, ArrowLeft, Video, Bot, Users, Activity, User as UserIcon, Wallet, ArrowUpRight, ArrowDownLeft, Smartphone, CreditCard, PiggyBank, RefreshCw, Send, Sparkles, Loader2, DollarSign, Check, History, Award, Edit2, Edit3, Save, X, Clock, Trash2, Plus , Shield, Info, Menu, ChevronRight, ChevronLeft, Film, FileText, Copy, Search, GraduationCap } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import ThemeToggle from './ThemeToggle';
@@ -37,6 +37,8 @@ import StudentPurchases from './StudentPurchases';
 import ParentInvoices from './ParentInvoices';
 import TeacherQuestionBank from './TeacherQuestionBank';
 import WalletRechargeRequestForm from './WalletRechargeRequestForm';
+import ChatBox from './ChatBox';
+
 
 const MOCK_TEACHER_STATS = [
   { id: 1, title: 'إجمالي الطلاب', value: '1,240', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
@@ -117,6 +119,7 @@ export default function Dashboard() {
     if (userData?.role === 'admin') {
       return [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس (الرسائل)', icon: MessageSquare },
         { id: 'admin', label: 'لوحة الإدارة', icon: Shield },
         { id: 'admin_recharge', label: 'شحن الرصيد', icon: Ticket },
         { id: 'admin_courses', label: 'الكورسات', icon: BookOpen },
@@ -130,6 +133,7 @@ export default function Dashboard() {
     } else if (userData?.role === 'teacher') {
       return [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس (الرسائل)', icon: MessageSquare },
         { id: 'classes', label: 'فصولي وإدارة الطلاب', icon: Users },
         { id: 'quizzes', label: 'إدارة الاختبارات والواجبات', icon: Award },
         { id: 'question_bank', label: 'بنك الأسئلة', icon: BookOpen },
@@ -142,6 +146,7 @@ export default function Dashboard() {
     } else if (userData?.role === 'parent') {
       return [
         { id: 'home', label: 'الرئيسية (متابعة الأبناء)', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس (الرسائل)', icon: MessageSquare },
         { id: 'quizzes', label: 'نتائج الاختبارات والتقييمات', icon: Award },
         { id: 'schedule', label: 'الجدول الدراسي للحصص', icon: Clock },
         { id: 'parent_invoices', label: 'الفواتير والمشتريات', icon: FileText },
@@ -159,6 +164,7 @@ export default function Dashboard() {
 
         const items = [
           { id: 'home', label: 'الرئيسية', icon: Target },
+          { id: 'chatbox', label: 'شات بوكس (الرسائل)', icon: MessageSquare },
         ];
 
         const hasAnySubscription = isSubscribedToQudurat || isSubscribedToTahsili;
@@ -185,6 +191,7 @@ export default function Dashboard() {
       }
       const base = [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس', icon: MessageSquare },
         { id: 'subjects', label: 'كورساتي', icon: BookOpen },
         { id: 'teachers_list', label: 'المعلمون', icon: Users },
         { id: 'student_store', label: 'المتجر', icon: ShoppingBag },
@@ -207,6 +214,7 @@ export default function Dashboard() {
     if (userData?.role === 'admin') {
       return [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس', icon: MessageSquare },
         { id: 'admin', label: 'لوحة الإدارة', icon: Shield },
         { id: 'admin_recharge', label: 'شحن الرصيد', icon: Ticket },
         { id: 'admin_courses', label: 'الكورسات', icon: BookOpen },
@@ -220,6 +228,7 @@ export default function Dashboard() {
     } else if (userData?.role === 'teacher') {
       return [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس', icon: MessageSquare },
         { id: 'classes', label: 'فصولي', icon: Users },
         { id: 'quizzes', label: 'الاختبارات', icon: Award },
         { id: 'question_bank', label: 'بنك الأسئلة', icon: BookOpen },
@@ -233,12 +242,12 @@ export default function Dashboard() {
     } else if (userData?.role === 'parent') {
       return [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس (الرسائل)', icon: MessageSquare },
         { id: 'quizzes', label: 'اختبارات الطالب', icon: Award },
         { id: 'schedule', label: 'الجدول الدراسي', icon: Clock },
         { id: 'reports', label: 'تقارير الطالب', icon: Flame },
         { id: 'parent_invoices', label: 'الفواتير والمشتريات', icon: FileText },
         { id: 'wallet', label: 'محفظة الطالب', icon: Ticket },
-        { id: 'messages', label: 'تواصل مع المعلمين', icon: Users },
         { id: 'profile', label: 'الملف الشخصي', icon: UserIcon },
       ];
     } else {
@@ -252,6 +261,7 @@ export default function Dashboard() {
 
         const items = [
           { id: 'home', label: 'الرئيسية', icon: Target },
+          { id: 'chatbox', label: 'شات بوكس', icon: MessageSquare },
         ];
 
         const hasAnySubscription = isSubscribedToQudurat || isSubscribedToTahsili;
@@ -278,6 +288,7 @@ export default function Dashboard() {
       }
       const base = [
         { id: 'home', label: 'الرئيسية', icon: Target },
+        { id: 'chatbox', label: 'شات بوكس', icon: MessageSquare },
         { id: 'subjects', label: 'موادي', icon: BookOpen },
         { id: 'teachers_list', label: 'المعلمون', icon: Users },
         { id: 'student_store', label: 'المتجر', icon: ShoppingBag },
@@ -296,6 +307,7 @@ export default function Dashboard() {
       ];
     }
   };
+
 
   useEffect(() => {
     if (tabQuery) {
@@ -1978,7 +1990,39 @@ export default function Dashboard() {
 
            <div className="hidden md:flex flex-col flex-1">
            </div>
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2 md:gap-4">
+              {/* Role Badge Indicator */}
+              {userData?.role && (
+                <div 
+                  title={`أنت مسجل حالياً كـ ${userData.role === 'student' ? 'طالب' : userData.role === 'teacher' ? 'معلم' : userData.role === 'parent' ? 'ولي أمر' : 'إدارة'}`}
+                  className={`flex items-center gap-1.5 px-2.5 md:px-3.5 py-1.5 rounded-2xl text-xs md:text-sm font-black shadow-sm border transition-all ${
+                    userData.role === 'student'
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                      : userData.role === 'teacher'
+                      ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                      : userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer'
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                      : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                  }`}
+                >
+                  {userData.role === 'student' && <GraduationCap className="w-4 h-4 shrink-0" />}
+                  {userData.role === 'teacher' && <Award className="w-4 h-4 shrink-0" />}
+                  {(userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer') && <Shield className="w-4 h-4 shrink-0" />}
+                  {userData.role === 'parent' && <Users className="w-4 h-4 shrink-0" />}
+                  
+                  <span className="flex items-center gap-1">
+                    <span className="text-[10px] md:text-xs opacity-75 hidden sm:inline">حساب:</span>
+                    <span>
+                      {userData.role === 'student' && 'طالب'}
+                      {userData.role === 'teacher' && 'معلم'}
+                      {(userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer') && 'إدارة'}
+                      {userData.role === 'parent' && 'ولي أمر'}
+                    </span>
+                  </span>
+                  <span className="w-2 h-2 rounded-full animate-pulse bg-current"></span>
+                </div>
+              )}
+
               {userData?.role === 'student' && (
                 <div 
                   onClick={() => setActiveTab('wallet')}
@@ -2005,7 +2049,19 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              <button
+                onClick={() => setActiveTab('chatbox')}
+                title="شات بوكس (الرسائل والتنبيهات)"
+                className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all relative ${
+                  activeTab === 'chatbox'
+                    ? 'bg-[#00B4D8] dark:bg-[#D4AF37] text-white shadow-md'
+                    : 'bg-gray-50 dark:bg-[#0D0D12] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#222230]'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
               <ThemeToggle />
+
               <button 
                 onClick={handleLogout}
                 className="md:hidden w-8 h-8 md:w-10 md:h-10 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center border border-red-150 dark:border-red-900/30 transition-all font-bold text-sm shadow-sm hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer"
@@ -2890,32 +2946,17 @@ export default function Dashboard() {
               </motion.div>
             )}
 
-            {activeTab === 'messages' && (
-              userData?.role === 'parent' ? (
-                <motion.div
-                  key="parent_teachers"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <ParentTeachersList userData={userData} linkedStudent={linkedStudent} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="soon"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="h-[60vh] flex flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400"
-                >
-                  <div className="w-20 h-20 bg-gray-50 dark:bg-[#0D0D12] border border-gray-200 dark:border-[#2D2D3D] rounded-2xl flex items-center justify-center mb-6">
-                    <Lock className="w-10 h-10 text-gray-600 dark:text-gray-300" />
-                  </div>
-                  <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">قريباً</h2>
-                  <p className="font-medium text-sm">يتم تجهيز هذا القسم ليواكب أحدث التعديلات</p>
-                </motion.div>
-              )
+            {(activeTab === 'chatbox' || activeTab === 'messages') && (
+              <motion.div
+                key="chatbox_view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <ChatBox userData={userData} linkedStudent={linkedStudent} />
+              </motion.div>
             )}
+
 
                         {(activeTab === 'analytics' || activeTab === 'reports') && (
               <motion.div

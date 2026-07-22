@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useAnimation } from 'motion/react';
-import { 
-  Play, CheckCircle2, TrendingUp, Sparkles, BookOpen, Clock, 
-  BarChart3, Zap, Shield, Target, Smartphone, Laptop 
-} from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import { usePlatformSettings } from '../context/PlatformSettingsContext';
 
 const AnimatedCounter = ({ value, label, suffix = "" }: { value: number, label: string, suffix?: string }) => {
   const [count, setCount] = useState(0);
@@ -37,45 +36,69 @@ const AnimatedCounter = ({ value, label, suffix = "" }: { value: number, label: 
 };
 
 export default function PremiumFeaturesSection() {
-  const features = [
+  const { settings } = usePlatformSettings();
+
+  const defaultFeatures = [
     {
-      icon: <Play className="w-6 h-6 text-[#D4AF37]" />,
+      id: "1",
+      iconName: "Play",
       title: "تعلم مصغر وذكي",
       desc: "دروس مقسمة لوحدات صغيرة لزيادة التركيز وتسهيل الفهم.",
     },
     {
-      icon: <Target className="w-6 h-6 text-[#D4AF37]" />,
+      id: "2",
+      iconName: "Target",
       title: "اختبارات تفاعلية",
       desc: "تقييم مستمر بعد كل درس لضمان استيعابك الكامل للمفاهيم.",
     },
     {
-      icon: <BarChart3 className="w-6 h-6 text-[#D4AF37]" />,
+      id: "3",
+      iconName: "BarChart3",
       title: "تحليلات متقدمة",
       desc: "تتبع دقيق لأدائك مع تقارير مخصصة توضح نقاط القوة والضعف.",
     },
     {
-      icon: <Zap className="w-6 h-6 text-[#D4AF37]" />,
+      id: "4",
+      iconName: "Zap",
       title: "مسارات مخصصة",
       desc: "خوارزميات ذكية تكيف المحتوى حسب سرعتك وأسلوبك في التعلم.",
     },
     {
-      icon: <Smartphone className="w-6 h-6 text-[#D4AF37]" />,
+      id: "5",
+      iconName: "Smartphone",
       title: "تجربة سلسة",
       desc: "تعلم في أي وقت ومن أي مكان عبر تطبيق مصمم بعناية فائقة.",
     },
     {
-      icon: <Shield className="w-6 h-6 text-[#D4AF37]" />,
+      id: "6",
+      iconName: "Shield",
       title: "بيئة آمنة وموثوقة",
       desc: "محتوى معتمد ومراجع من قبل نخبة من أفضل المعلمين والخبراء.",
     }
   ];
 
-  const journeySteps = [
-    { title: "التقييم المبدئي", desc: "نحلل مستواك الحالي لنرسم لك المسار الأنسب." },
-    { title: "رحلة التعلم", desc: "تدرس المفاهيم خطوة بخطوة مع تدريبات مستمرة." },
-    { title: "المراجعة الذكية", desc: "نركز على نقاط ضعفك لضمان إتقانك لكل درس." },
-    { title: "التفوق النهائي", desc: "تكون مستعداً تماماً لاجتياز الامتحانات بثقة." }
+  const defaultJourneySteps = [
+    { id: "1", title: "التقييم المبدئي", desc: "نحلل مستواك الحالي لنرسم لك المسار الأنسب." },
+    { id: "2", title: "رحلة التعلم", desc: "تدرس المفاهيم خطوة بخطوة مع تدريبات مستمرة." },
+    { id: "3", title: "المراجعة الذكية", desc: "نركز على نقاط ضعفك لضمان إتقانك لكل درس." },
+    { id: "4", title: "التفوق النهائي", desc: "تكون مستعداً تماماً لاجتياز الامتحانات بثقة." }
   ];
+
+  const defaultStats = [
+    { id: "1", value: 50, suffix: "K+", label: "طالب نشط" },
+    { id: "2", value: 98, suffix: "%", label: "نسبة النجاح" },
+    { id: "3", value: 120, suffix: "+", label: "دورة تدريبية" },
+    { id: "4", value: 4, suffix: ".9", label: "تقييم المنصة" }
+  ];
+
+  const activeFeatures = settings.featuresList && settings.featuresList.length > 0 ? settings.featuresList : defaultFeatures;
+  const activeJourneySteps = settings.journeySteps && settings.journeySteps.length > 0 ? settings.journeySteps : defaultJourneySteps;
+  const activeStats = settings.statsCounters && settings.statsCounters.length > 0 ? settings.statsCounters : defaultStats;
+
+  const renderIcon = (iconName: string) => {
+    const IconComponent = (LucideIcons as any)[iconName] || LucideIcons.Sparkles;
+    return <IconComponent className="w-6 h-6 text-[#D4AF37]" />;
+  };
 
   return (
     <section id="how-it-works" className="py-16 sm:py-24 lg:py-28 relative overflow-hidden bg-white dark:bg-[#0A0A0A] text-gray-900 dark:text-white dir-rtl border-t border-gray-100 dark:border-white/5" dir="rtl">
@@ -97,22 +120,21 @@ export default function PremiumFeaturesSection() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4AF37]/10 dark:bg-white/5 border border-[#D4AF37]/20 dark:border-white/10 mb-8 backdrop-blur-md">
               <Sparkles className="w-4 h-4 text-[#D4AF37]" />
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-300">مستقبل التعليم الرقمي</span>
+              <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{settings.featuresBadge || 'مستقبل التعليم الرقمي'}</span>
             </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 leading-tight tracking-tight text-gray-900 dark:text-white">
-              منصة تعليمية <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#B8860B] via-[#D4AF37] to-[#B8860B] dark:from-[#D4AF37] dark:via-[#FACC15] dark:to-[#D4AF37]">بمعايير عالمية</span>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 leading-tight tracking-tight text-gray-900 dark:text-white whitespace-pre-line">
+              {settings.featuresTitle || 'منصة تعليمية بمعايير عالمية'}
             </h2>
             <p className="text-lg md:text-xl text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto leading-relaxed">
-              تجربة تعليمية متكاملة مصممة بذكاء لتناسب احتياجات كل طالب، مع أدوات تحليل وتتبع تضمن التفوق المستمر.
+              {settings.featuresSubtitle || 'تجربة تعليمية متكاملة مصممة بذكاء لتناسب احتياجات كل طالب، مع أدوات تحليل وتتبع تضمن التفوق المستمر.'}
             </p>
           </motion.div>
         </div>
 
-        {/* 6 Premium Feature Cards */}
+        {/* Premium Feature Cards */}
         <div className="mb-32">
            <div className="text-center mb-16">
-             <h3 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-4">كل ما تحتاجه للنجاح</h3>
+             <h3 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-4">{settings.featuresListTitle || 'كل ما تحتاجه للنجاح'}</h3>
            </div>
            
            <motion.div 
@@ -125,9 +147,9 @@ export default function PremiumFeaturesSection() {
              }}
              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
            >
-              {features.map((feature, i) => (
+              {activeFeatures.map((feature, i) => (
                  <motion.div
-                    key={i}
+                    key={feature.id || i}
                     variants={{
                        hidden: { opacity: 0, y: 30 },
                        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
@@ -136,7 +158,7 @@ export default function PremiumFeaturesSection() {
                  >
                     <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/0 to-[#D4AF37]/0 group-hover:from-[#D4AF37]/5 dark:group-hover:from-[#D4AF37]/10 group-hover:to-transparent transition-colors duration-500 pointer-events-none"></div>
                     <div className="w-12 h-12 rounded-xl bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 shadow-sm dark:shadow-none flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 group-hover:shadow-[0_0_20px_rgba(212,175,55,0.2)] dark:group-hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] group-hover:border-[#D4AF37]/30">
-                       {feature.icon}
+                       {renderIcon(feature.iconName)}
                     </div>
                     <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-[#B8860B] dark:group-hover:text-[#D4AF37] transition-colors">{feature.title}</h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400 font-medium leading-relaxed">{feature.desc}</p>
@@ -146,17 +168,16 @@ export default function PremiumFeaturesSection() {
         </div>
 
         {/* Animated Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-32 relative z-20">
-           <AnimatedCounter value={50} suffix="K+" label="طالب نشط" />
-           <AnimatedCounter value={98} suffix="%" label="نسبة النجاح" />
-           <AnimatedCounter value={120} suffix="+" label="دورة تدريبية" />
-           <AnimatedCounter value={4} suffix=".9" label="تقييم المنصة" />
+        <div className={`grid grid-cols-2 md:grid-cols-${Math.min(activeStats.length, 4)} gap-4 md:gap-6 mb-32 relative z-20`}>
+           {activeStats.map((stat, i) => (
+             <AnimatedCounter key={stat.id || i} value={stat.value} suffix={stat.suffix} label={stat.label} />
+           ))}
         </div>
 
         {/* Interactive Timeline Journey */}
         <div className="max-w-4xl mx-auto">
            <div className="text-center mb-16">
-             <h3 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-4">رحلة الطالب نحو التفوق</h3>
+             <h3 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-4">{settings.journeyTitle || 'رحلة الطالب نحو التفوق'}</h3>
            </div>
            
            <div className="relative border-r-2 border-gray-200 dark:border-white/10 pr-8 md:pr-0 md:border-r-0">
@@ -164,9 +185,9 @@ export default function PremiumFeaturesSection() {
               <div className="hidden md:block absolute top-0 bottom-0 right-1/2 translate-x-px w-0.5 bg-gradient-to-b from-transparent via-gray-200 dark:via-white/10 to-transparent"></div>
               
               <div className="space-y-12 md:space-y-24">
-                 {journeySteps.map((step, i) => (
+                 {activeJourneySteps.map((step, i) => (
                     <motion.div 
-                       key={i}
+                       key={step.id || i}
                        initial={{ opacity: 0, y: 20 }}
                        whileInView={{ opacity: 1, y: 0 }}
                        viewport={{ once: true, margin: "-50px" }}

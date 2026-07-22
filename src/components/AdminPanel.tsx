@@ -4,6 +4,7 @@ import { ref, getDownloadURL } from 'firebase/storage';
 import { uploadFileToFirebase } from '../lib/upload';
 import { db, storage, auth } from '../lib/firebase';
 import { usePlatformSettings } from '../context/PlatformSettingsContext';
+import { FAQItem, FeatureCardItem, JourneyStepItem, StatCounterItem } from '../types';
 import { 
   Users, BookOpen, Shield, Trash2, Edit2, Edit3, Loader2, CheckCircle2, 
   Eye, EyeOff, Printer, X, Calendar, User as UserIcon, Mail, Phone, Lock, 
@@ -11,12 +12,13 @@ import {
   Hash, Award, FileCheck, Check, Activity, ShieldAlert,
   MapPin, School, PhoneCall, Layers, Clock, Search, Filter,
   ArrowUpDown, SlidersHorizontal, RotateCcw, Archive, Download, Plus,
-  CreditCard, Image as ImageIcon, XCircle, Copy, History, DollarSign, Ticket, Wallet, RefreshCw, Film, PlayCircle
+  CreditCard, Image as ImageIcon, XCircle, Copy, History, DollarSign, Ticket, Wallet, RefreshCw, Film, PlayCircle, Heart, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import AdminVisualStats from './AdminVisualStats';
 import SubscriptionRequests from './SubscriptionRequests';
+import SupportRequestsAdmin from './SupportRequestsAdmin';
 
 const formatRegistrationDate = (createdAt: any) => {
   if (!createdAt) return '13/07/2026';
@@ -957,11 +959,11 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
   );
 };
 
-export default function AdminPanel({ initialTab, userData }: { initialTab?: 'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests'; userData?: any }) {
+export default function AdminPanel({ initialTab, userData }: { initialTab?: 'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests' | 'support_requests'; userData?: any }) {
   const [users, setUsers] = useState<any[]>([]);
   const [progressRecords, setProgressRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests'>(initialTab || 'students');
+  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests' | 'support_requests'>(initialTab || 'students');
 
   useEffect(() => {
     if (initialTab) {
@@ -1015,6 +1017,35 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
   const [newSubjectColor, setNewSubjectColor] = useState('bg-blue-100 text-blue-600');
   const [isAddingSubject, setIsAddingSubject] = useState(false);
 
+  // FAQ Management State
+  const [tempFaqs, setTempFaqs] = useState<FAQItem[]>(
+    platformSettings.customFaqs && platformSettings.customFaqs.length > 0
+      ? platformSettings.customFaqs
+      : [
+          {
+            id: '1',
+            q: 'هل تسجيل الدخول وإنشاء الحساب في المنصة مجاني؟',
+            a: 'نعم، التسجيل في المنصة مجاني تماماً ويمكنك استكشاف الواجهة وتجربة بعض الدروس المجانية، ولفتح الكورسات والمواد كاملة يمكنك الاشتراك في الباقات المتاحة.'
+          },
+          {
+            id: '2',
+            q: 'إزاي أقدر أشترك في الباقات أو أشحن المحفظة؟',
+            a: 'نوفر عدة طرق سهلة ومريحة تشمل: الدفع الإلكتروني (فودافون كاش، إنستا باي، التحويل البنكي)، أو شحن رصيد المحفظة باستخدام كروت الشحن وأكواد التفعيل.'
+          },
+          {
+            id: '3',
+            q: 'هل يمكنني مشاهدة الدروس أو تحميل المذكرات؟',
+            a: 'يمكنك مشاهدة جميع دروسك أونلاين بجودة عالية وبدون تقطيع، كما يمكنك تحميل جميع المذكرات والملخصات بصيغة PDF لمذاكرتها ومراجعتها في أي وقت.'
+          }
+        ]
+  );
+  const [newFaqQ, setNewFaqQ] = useState('');
+  const [newFaqA, setNewFaqA] = useState('');
+  const [isAddingFaq, setIsAddingFaq] = useState(false);
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
+  const [editingFaqQ, setEditingFaqQ] = useState('');
+  const [editingFaqA, setEditingFaqA] = useState('');
+
   const subjectIconOptions = [
     'Calculator', 'Zap', 'FlaskConical', 'Dna', 'Languages', 'BookOpenText', 'Scroll', 'Globe', 'BookOpen', 'Trophy', 'Award', 'GraduationCap', 'Star', 'Users'
   ];
@@ -1035,6 +1066,263 @@ export default function AdminPanel({ initialTab, userData }: { initialTab?: 'stu
       setTempSubjects(platformSettings.subjects);
     }
   }, [platformSettings.subjects]);
+
+  useEffect(() => {
+    if (platformSettings.customFaqs && platformSettings.customFaqs.length > 0) {
+      setTempFaqs(platformSettings.customFaqs);
+    }
+  }, [platformSettings.customFaqs]);
+
+  // Dynamic Features List State
+  const [tempFeaturesList, setTempFeaturesList] = useState<FeatureCardItem[]>(
+    platformSettings.featuresList && platformSettings.featuresList.length > 0
+      ? platformSettings.featuresList
+      : [
+          { id: '1', iconName: 'Play', title: 'تعلم مصغر وذكي', desc: 'دروس مقسمة لوحدات صغيرة لزيادة التركيز وتسهيل الفهم.' },
+          { id: '2', iconName: 'Target', title: 'اختبارات تفاعلية', desc: 'تقييم مستمر بعد كل درس لضمان استيعابك الكامل للمفاهيم.' },
+          { id: '3', iconName: 'BarChart3', title: 'تحليلات متقدمة', desc: 'تتبع دقيق لأدائك مع تقارير مخصصة توضح نقاط القوة والضعف.' },
+          { id: '4', iconName: 'Zap', title: 'مسارات مخصصة', desc: 'خوارزميات ذكية تكيف المحتوى حسب سرعتك وأسلوبك في التعلم.' },
+          { id: '5', iconName: 'Smartphone', title: 'تجربة سلسة', desc: 'تعلم في أي وقت ومن أي مكان عبر تطبيق مصمم بعناية فائقة.' },
+          { id: '6', iconName: 'Shield', title: 'بيئة آمنة وموثوقة', desc: 'محتوى معتمد ومراجع من قبل نخبة من أفضل المعلمين والخبراء.' }
+        ]
+  );
+  const [newFeatureTitle, setNewFeatureTitle] = useState('');
+  const [newFeatureDesc, setNewFeatureDesc] = useState('');
+  const [newFeatureIcon, setNewFeatureIcon] = useState('Play');
+  const [isAddingFeature, setIsAddingFeature] = useState(false);
+  const [editingFeatureId, setEditingFeatureId] = useState<string | null>(null);
+  const [editingFeatureTitle, setEditingFeatureTitle] = useState('');
+  const [editingFeatureDesc, setEditingFeatureDesc] = useState('');
+  const [editingFeatureIcon, setEditingFeatureIcon] = useState('Play');
+
+  // Dynamic Journey Steps State
+  const [tempJourneySteps, setTempJourneySteps] = useState<JourneyStepItem[]>(
+    platformSettings.journeySteps && platformSettings.journeySteps.length > 0
+      ? platformSettings.journeySteps
+      : [
+          { id: '1', title: 'التقييم المبدئي', desc: 'نحلل مستواك الحالي لنرسم لك المسار الأنسب.' },
+          { id: '2', title: 'رحلة التعلم', desc: 'تدرس المفاهيم خطوة بخطوة مع تدريبات مستمرة.' },
+          { id: '3', title: 'المراجعة الذكية', desc: 'نركز على نقاط ضعفك لضمان إتقانك لكل درس.' },
+          { id: '4', title: 'التفوق النهائي', desc: 'تكون مستعداً تماماً لاجتياز الامتحانات بثقة.' }
+        ]
+  );
+  const [newStepTitle, setNewStepTitle] = useState('');
+  const [newStepDesc, setNewStepDesc] = useState('');
+  const [isAddingStep, setIsAddingStep] = useState(false);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editingStepTitle, setEditingStepTitle] = useState('');
+  const [editingStepDesc, setEditingStepDesc] = useState('');
+
+  // Dynamic Stats Counters State
+  const [tempStatsCounters, setTempStatsCounters] = useState<StatCounterItem[]>(
+    platformSettings.statsCounters && platformSettings.statsCounters.length > 0
+      ? platformSettings.statsCounters
+      : [
+          { id: '1', value: 50, suffix: 'K+', label: 'طالب نشط' },
+          { id: '2', value: 98, suffix: '%', label: 'نسبة النجاح' },
+          { id: '3', value: 120, suffix: '+', label: 'دورة تدريبية' },
+          { id: '4', value: 4, suffix: '.9', label: 'تقييم المنصة' }
+        ]
+  );
+  const [newStatValue, setNewStatValue] = useState<number>(100);
+  const [newStatSuffix, setNewStatSuffix] = useState('+');
+  const [newStatLabel, setNewStatLabel] = useState('');
+  const [isAddingStat, setIsAddingStat] = useState(false);
+  const [editingStatId, setEditingStatId] = useState<string | null>(null);
+  const [editingStatValue, setEditingStatValue] = useState<number>(0);
+  const [editingStatSuffix, setEditingStatSuffix] = useState('');
+  const [editingStatLabel, setEditingStatLabel] = useState('');
+
+  useEffect(() => {
+    if (platformSettings.featuresList && platformSettings.featuresList.length > 0) {
+      setTempFeaturesList(platformSettings.featuresList);
+    }
+  }, [platformSettings.featuresList]);
+
+  useEffect(() => {
+    if (platformSettings.journeySteps && platformSettings.journeySteps.length > 0) {
+      setTempJourneySteps(platformSettings.journeySteps);
+    }
+  }, [platformSettings.journeySteps]);
+
+  useEffect(() => {
+    if (platformSettings.statsCounters && platformSettings.statsCounters.length > 0) {
+      setTempStatsCounters(platformSettings.statsCounters);
+    }
+  }, [platformSettings.statsCounters]);
+
+  const featureIconOptions = [
+    'Play', 'Target', 'BarChart3', 'Zap', 'Smartphone', 'Shield', 'BookOpen', 'Clock', 'Laptop', 'Award', 'Trophy', 'Sparkles', 'CheckCircle2', 'TrendingUp', 'Users', 'GraduationCap', 'Activity'
+  ];
+
+  // Feature Handlers
+  const handleAddFeature = () => {
+    if (!newFeatureTitle.trim() || !newFeatureDesc.trim()) {
+      toast.error('يرجى إدخال عنوان الكارت والوصف');
+      return;
+    }
+    const item: FeatureCardItem = {
+      id: Date.now().toString(),
+      iconName: newFeatureIcon,
+      title: newFeatureTitle.trim(),
+      desc: newFeatureDesc.trim()
+    };
+    setTempFeaturesList(prev => [...prev, item]);
+    setNewFeatureTitle('');
+    setNewFeatureDesc('');
+    setIsAddingFeature(false);
+    toast.success('تمت إضافة الميزة! لا تنسَ حفظ الإعدادات');
+  };
+
+  const handleDeleteFeature = (id: string) => {
+    setTempFeaturesList(prev => prev.filter(f => f.id !== id));
+    toast.success('تم حذف الميزة من القائمة');
+  };
+
+  const handleStartEditFeature = (item: FeatureCardItem) => {
+    setEditingFeatureId(item.id);
+    setEditingFeatureTitle(item.title);
+    setEditingFeatureDesc(item.desc);
+    setEditingFeatureIcon(item.iconName || 'Play');
+  };
+
+  const handleSaveEditFeature = (id: string) => {
+    if (!editingFeatureTitle.trim() || !editingFeatureDesc.trim()) {
+      toast.error('يرجى إدخال العنوان والوصف');
+      return;
+    }
+    setTempFeaturesList(prev => prev.map(item => item.id === id ? { ...item, title: editingFeatureTitle.trim(), desc: editingFeatureDesc.trim(), iconName: editingFeatureIcon } : item));
+    setEditingFeatureId(null);
+    toast.success('تم التحديث! لا تنسَ حفظ الإعدادات');
+  };
+
+  // Step Handlers
+  const handleAddStep = () => {
+    if (!newStepTitle.trim() || !newStepDesc.trim()) {
+      toast.error('يرجى إدخال عنوان الخطوة ووصفها');
+      return;
+    }
+    const item: JourneyStepItem = {
+      id: Date.now().toString(),
+      title: newStepTitle.trim(),
+      desc: newStepDesc.trim()
+    };
+    setTempJourneySteps(prev => [...prev, item]);
+    setNewStepTitle('');
+    setNewStepDesc('');
+    setIsAddingStep(false);
+    toast.success('تمت إضافة الخطوة! لا تنسَ حفظ الإعدادات');
+  };
+
+  const handleDeleteStep = (id: string) => {
+    setTempJourneySteps(prev => prev.filter(s => s.id !== id));
+    toast.success('تم حذف الخطوة من القائمة');
+  };
+
+  const handleStartEditStep = (item: JourneyStepItem) => {
+    setEditingStepId(item.id);
+    setEditingStepTitle(item.title);
+    setEditingStepDesc(item.desc);
+  };
+
+  const handleSaveEditStep = (id: string) => {
+    if (!editingStepTitle.trim() || !editingStepDesc.trim()) {
+      toast.error('يرجى إدخال عنوان الخطوة ووصفها');
+      return;
+    }
+    setTempJourneySteps(prev => prev.map(item => item.id === id ? { ...item, title: editingStepTitle.trim(), desc: editingStepDesc.trim() } : item));
+    setEditingStepId(null);
+    toast.success('تم تحديث الخطوة! لا تنسَ حفظ الإعدادات');
+  };
+
+  // Stat Handlers
+  const handleAddStat = () => {
+    if (!newStatLabel.trim()) {
+      toast.error('يرجى إدخال تسمية الإحصائية');
+      return;
+    }
+    const item: StatCounterItem = {
+      id: Date.now().toString(),
+      value: newStatValue,
+      suffix: newStatSuffix.trim(),
+      label: newStatLabel.trim()
+    };
+    setTempStatsCounters(prev => [...prev, item]);
+    setNewStatLabel('');
+    setNewStatValue(100);
+    setNewStatSuffix('+');
+    setIsAddingStat(false);
+    toast.success('تمت إضافة الرقم الإحصائي!');
+  };
+
+  const handleDeleteStat = (id: string) => {
+    setTempStatsCounters(prev => prev.filter(st => st.id !== id));
+    toast.success('تم حذف الرقم الإحصائي');
+  };
+
+  const handleStartEditStat = (item: StatCounterItem) => {
+    setEditingStatId(item.id);
+    setEditingStatValue(item.value);
+    setEditingStatSuffix(item.suffix);
+    setEditingStatLabel(item.label);
+  };
+
+  const handleSaveEditStat = (id: string) => {
+    if (!editingStatLabel.trim()) {
+      toast.error('يرجى إدخال التسمية');
+      return;
+    }
+    setTempStatsCounters(prev => prev.map(item => item.id === id ? { ...item, value: editingStatValue, suffix: editingStatSuffix, label: editingStatLabel.trim() } : item));
+    setEditingStatId(null);
+    toast.success('تم تعديل الإحصائية!');
+  };
+
+  const handleAddFaq = () => {
+    if (!newFaqQ.trim() || !newFaqA.trim()) {
+      toast.error('يرجى إدخال السؤال والإجابة كلاهما');
+      return;
+    }
+    const newFaqItem: FAQItem = {
+      id: Date.now().toString(),
+      q: newFaqQ.trim(),
+      a: newFaqA.trim()
+    };
+    setTempFaqs(prev => [...prev, newFaqItem]);
+    setNewFaqQ('');
+    setNewFaqA('');
+    setIsAddingFaq(false);
+    toast.success('تمت إضافة السؤال بنجاح! لا تنسَ حفظ الإعدادات');
+  };
+
+  const handleDeleteFaq = (id: string) => {
+    setTempFaqs(prev => prev.filter(f => f.id !== id));
+    toast.success('تم حذف السؤال من القائمة');
+  };
+
+  const handleStartEditFaq = (faq: FAQItem) => {
+    setEditingFaqId(faq.id);
+    setEditingFaqQ(faq.q);
+    setEditingFaqA(faq.a);
+  };
+
+  const handleSaveEditFaq = (id: string) => {
+    if (!editingFaqQ.trim() || !editingFaqA.trim()) {
+      toast.error('يرجى إدخال السؤال والإجابة كلاهما');
+      return;
+    }
+    setTempFaqs(prev => prev.map(f => f.id === id ? { ...f, q: editingFaqQ.trim(), a: editingFaqA.trim() } : f));
+    setEditingFaqId(null);
+    toast.success('تم تحديث السؤال بنجاح');
+  };
+
+  const handleMoveFaq = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= tempFaqs.length) return;
+    const updated = [...tempFaqs];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIdx, 0, moved);
+    setTempFaqs(updated);
+  };
 
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -1353,6 +1641,14 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
         showFaqSection: formData.get('showFaqSection') === 'true',
         gradesTitle: (formData.get('gradesTitle') as string) || platformSettings.gradesTitle || '',
         gradesSubtitle: (formData.get('gradesSubtitle') as string) || platformSettings.gradesSubtitle || '',
+        featuresBadge: (formData.get('featuresBadge') as string) || platformSettings.featuresBadge || '',
+        featuresTitle: (formData.get('featuresTitle') as string) || platformSettings.featuresTitle || '',
+        featuresSubtitle: (formData.get('featuresSubtitle') as string) || platformSettings.featuresSubtitle || '',
+        featuresListTitle: (formData.get('featuresListTitle') as string) || platformSettings.featuresListTitle || '',
+        featuresList: tempFeaturesList || [],
+        journeyTitle: (formData.get('journeyTitle') as string) || platformSettings.journeyTitle || '',
+        journeySteps: tempJourneySteps || [],
+        statsCounters: tempStatsCounters || [],
         subjectsTitle: (formData.get('subjectsTitle') as string) || platformSettings.subjectsTitle || '',
         subjectsSubtitle: (formData.get('subjectsSubtitle') as string) || platformSettings.subjectsSubtitle || '',
         faqTitle: (formData.get('faqTitle') as string) || platformSettings.faqTitle || '',
@@ -1365,7 +1661,10 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
         isBankAccountEnabled: formData.get('isBankAccountEnabled') === 'true',
         customPaymentMethods: tempPaymentMethods || [],
         subjects: tempSubjects || [],
+        customFaqs: tempFaqs || [],
         contactPhone: (formData.get('contactPhone') as string) || platformSettings.contactPhone || '',
+        floatingWhatsappNumber: (formData.get('floatingWhatsappNumber') as string) || platformSettings.floatingWhatsappNumber || '',
+        isFloatingWhatsappEnabled: formData.get('isFloatingWhatsappEnabled') === 'true',
         contactEmail: (formData.get('contactEmail') as string) || platformSettings.contactEmail || '',
         contactAddress: (formData.get('contactAddress') as string) || platformSettings.contactAddress || '',
         quduratVideoUrl: (formData.get('quduratVideoUrl') as string) || '',
@@ -1380,6 +1679,9 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
         heroVideoProvider: (formData.get('heroVideoProvider') as 'bunny' | 'tiktok' | 'youtube' | 'direct') || 'youtube',
         heroVideoTitle: (formData.get('heroVideoTitle') as string) || 'الفيديو التعريفي لمنصة Teachland 🚀',
         heroVideoPoster: heroVideoPoster || '',
+        privacyPolicyText: (formData.get('privacyPolicyText') as string) || platformSettings.privacyPolicyText || '',
+        termsConditionsText: (formData.get('termsConditionsText') as string) || platformSettings.termsConditionsText || '',
+        intellectualPropertyText: (formData.get('intellectualPropertyText') as string) || platformSettings.intellectualPropertyText || '',
         socialLinks: {
           facebook: (formData.get('facebook') as string) || platformSettings.socialLinks?.facebook || '',
           twitter: (formData.get('twitter') as string) || platformSettings.socialLinks?.twitter || '',
@@ -2081,6 +2383,23 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
             )}
           </button>
           <button
+            onClick={() => setActiveTab('support_requests')}
+            className={`pb-2 text-sm font-black transition-colors relative ${
+              activeTab === 'support_requests'
+                ? 'text-[#00B4D8] dark:text-[#D4AF37]'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+            }`}
+          >
+            طلبات المراسلة
+            {activeTab === 'support_requests' && (
+              <motion.div 
+                layoutId="adminTab" 
+                className="absolute -bottom-[13px] left-0 right-0 h-[3px] bg-[#00B4D8] dark:bg-[#D4AF37] rounded-t-full shadow-[0_1px_4px_rgba(0,180,216,0.3)] dark:shadow-[0_1px_4px_rgba(212,175,55,0.3)]" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className={`pb-2 text-sm font-black transition-colors relative ${
               activeTab === 'settings'
@@ -2733,6 +3052,404 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                   </div>
 
                   <div className="space-y-3 md:col-span-2 border-t border-gray-100 dark:border-[#2D2D3D] pt-4">
+                    <h4 className="text-xs font-black text-amber-500">إعدادات قسم المميزات وكيف نعمل (How It Works)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 block mb-1">شارة القسم (Badge)</label>
+                        <input
+                          type="text"
+                          name="featuresBadge"
+                          defaultValue={platformSettings.featuresBadge || 'مستقبل التعليم الرقمي'}
+                          className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 block mb-1">عنوان القسم الرئيس</label>
+                        <input
+                          type="text"
+                          name="featuresTitle"
+                          defaultValue={platformSettings.featuresTitle || 'منصة تعليمية بمعايير عالمية'}
+                          className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 block mb-1">الوصف الفرعي للقسم</label>
+                        <input
+                          type="text"
+                          name="featuresSubtitle"
+                          defaultValue={platformSettings.featuresSubtitle || 'تجربة تعليمية متكاملة مصممة بذكاء لتناسب احتياجات كل طالب، مع أدوات تحليل وتتبع تضمن التفوق المستمر.'}
+                          className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Feature Cards Manager */}
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#2D2D3D]">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">كروت المميزات</h5>
+                          <p className="text-[10px] text-gray-500">يمكنك تعديل وإضافة وحذف كروت المميزات المعروضة بالصفحة الرئيسية</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingFeature(!isAddingFeature)}
+                          className="px-3 py-1.5 text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-500/20 transition font-bold flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          {isAddingFeature ? 'إلغاء' : 'إضافة ميزة جديدة'}
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 block mb-1">عنوان مجموعة المميزات</label>
+                        <input
+                          type="text"
+                          name="featuresListTitle"
+                          defaultValue={platformSettings.featuresListTitle || 'كل ما تحتاجه للنجاح'}
+                          className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs mb-3"
+                        />
+                      </div>
+
+                      {/* Add Form */}
+                      {isAddingFeature && (
+                        <div className="p-3 mb-3 bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-xl space-y-3">
+                          <h6 className="text-xs font-bold text-amber-600 dark:text-amber-400">إضافة ميزة جديدة</h6>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">عنوان الميزة</label>
+                              <input
+                                type="text"
+                                value={newFeatureTitle}
+                                onChange={(e) => setNewFeatureTitle(e.target.value)}
+                                placeholder="مثال: اختبارات تفاعلية"
+                                className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">الأيقونة</label>
+                              <select
+                                value={newFeatureIcon}
+                                onChange={(e) => setNewFeatureIcon(e.target.value)}
+                                className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                              >
+                                {featureIconOptions.map(icon => (
+                                  <option key={icon} value={icon}>{icon}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 block mb-1">وصف الميزة</label>
+                            <textarea
+                              value={newFeatureDesc}
+                              onChange={(e) => setNewFeatureDesc(e.target.value)}
+                              rows={2}
+                              placeholder="وصف مختصر للميزة..."
+                              className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddFeature}
+                            className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition"
+                          >
+                            تأكيد الإضافة
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Items List */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {tempFeaturesList.map((item) => (
+                          <div key={item.id} className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl flex items-start justify-between gap-2">
+                            {editingFeatureId === item.id ? (
+                              <div className="w-full space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input
+                                    type="text"
+                                    value={editingFeatureTitle}
+                                    onChange={(e) => setEditingFeatureTitle(e.target.value)}
+                                    className="bg-white dark:bg-[#12121A] border rounded-lg px-2 py-1 text-xs font-bold dark:text-white"
+                                  />
+                                  <select
+                                    value={editingFeatureIcon}
+                                    onChange={(e) => setEditingFeatureIcon(e.target.value)}
+                                    className="bg-white dark:bg-[#12121A] border rounded-lg px-2 py-1 text-xs font-bold dark:text-white"
+                                  >
+                                    {featureIconOptions.map(icon => (
+                                      <option key={icon} value={icon}>{icon}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <textarea
+                                  value={editingFeatureDesc}
+                                  onChange={(e) => setEditingFeatureDesc(e.target.value)}
+                                  rows={2}
+                                  className="w-full bg-white dark:bg-[#12121A] border rounded-lg px-2 py-1 text-xs dark:text-white"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEditFeature(item.id)}
+                                    className="px-2.5 py-1 bg-green-500 text-white rounded-lg text-xs font-bold"
+                                  >
+                                    حفظ
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingFeatureId(null)}
+                                    className="px-2.5 py-1 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-xs font-bold"
+                                  >
+                                    إلغاء
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 font-bold">{item.iconName || 'Play'}</span>
+                                    <h6 className="text-xs font-bold text-gray-900 dark:text-white">{item.title}</h6>
+                                  </div>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2">{item.desc}</p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditFeature(item)}
+                                    className="p-1 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteFeature(item.id)}
+                                    className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Stats Counters Manager */}
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#2D2D3D]">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">العدادات الإحصائية</h5>
+                          <p className="text-[10px] text-gray-500">العدادات الرقمية المتحركة (مثال: +50K طالب نشط)</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingStat(!isAddingStat)}
+                          className="px-3 py-1.5 text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-500/20 transition font-bold flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          {isAddingStat ? 'إلغاء' : 'إضافة إحصائية'}
+                        </button>
+                      </div>
+
+                      {/* Add Stat Form */}
+                      {isAddingStat && (
+                        <div className="p-3 mb-3 bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-xl space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">الرقم المستهدف</label>
+                              <input
+                                type="number"
+                                value={newStatValue}
+                                onChange={(e) => setNewStatValue(Number(e.target.value))}
+                                className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">الرمز الملحق (Suffix)</label>
+                              <input
+                                type="text"
+                                value={newStatSuffix}
+                                onChange={(e) => setNewStatSuffix(e.target.value)}
+                                placeholder="مثال: K+ أو %"
+                                className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1">التسمية (العنوان)</label>
+                              <input
+                                type="text"
+                                value={newStatLabel}
+                                onChange={(e) => setNewStatLabel(e.target.value)}
+                                placeholder="مثال: طالب نشط"
+                                className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddStat}
+                            className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition"
+                          >
+                            إضافة الإحصائية
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Stats Items */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {tempStatsCounters.map((stat) => (
+                          <div key={stat.id} className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl flex items-center justify-between">
+                            {editingStatId === stat.id ? (
+                              <div className="w-full space-y-2">
+                                <input
+                                  type="number"
+                                  value={editingStatValue}
+                                  onChange={(e) => setEditingStatValue(Number(e.target.value))}
+                                  className="w-full bg-white dark:bg-[#12121A] border rounded px-2 py-1 text-xs dark:text-white font-bold"
+                                />
+                                <input
+                                  type="text"
+                                  value={editingStatSuffix}
+                                  onChange={(e) => setEditingStatSuffix(e.target.value)}
+                                  className="w-full bg-white dark:bg-[#12121A] border rounded px-2 py-1 text-xs dark:text-white font-bold"
+                                />
+                                <input
+                                  type="text"
+                                  value={editingStatLabel}
+                                  onChange={(e) => setEditingStatLabel(e.target.value)}
+                                  className="w-full bg-white dark:bg-[#12121A] border rounded px-2 py-1 text-xs dark:text-white font-bold"
+                                />
+                                <div className="flex gap-1">
+                                  <button type="button" onClick={() => handleSaveEditStat(stat.id)} className="px-2 py-0.5 bg-green-500 text-white text-xs rounded font-bold">حفظ</button>
+                                  <button type="button" onClick={() => setEditingStatId(null)} className="px-2 py-0.5 bg-gray-300 dark:bg-gray-700 text-xs rounded font-bold">إلغاء</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div>
+                                  <div className="text-sm font-black text-amber-500">{stat.value}{stat.suffix}</div>
+                                  <div className="text-[10px] text-gray-500 font-bold">{stat.label}</div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button type="button" onClick={() => handleStartEditStat(stat)} className="p-1 text-blue-500"><Edit2 className="w-3.5 h-3.5" /></button>
+                                  <button type="button" onClick={() => handleDeleteStat(stat.id)} className="p-1 text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Journey Timeline Steps Manager */}
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#2D2D3D]">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">رحلة الطالب (Timeline Steps)</h5>
+                          <p className="text-[10px] text-gray-500">خطوات رحلة الطالب التفاعلية بالصفحة الرئيسية</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingStep(!isAddingStep)}
+                          className="px-3 py-1.5 text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-500/20 transition font-bold flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          {isAddingStep ? 'إلغاء' : 'إضافة خطوة'}
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 block mb-1">عنوان قسم الرحلة</label>
+                        <input
+                          type="text"
+                          name="journeyTitle"
+                          defaultValue={platformSettings.journeyTitle || 'رحلة الطالب نحو التفوق'}
+                          className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs mb-3"
+                        />
+                      </div>
+
+                      {/* Add Step Form */}
+                      {isAddingStep && (
+                        <div className="p-3 mb-3 bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-xl space-y-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 block mb-1">عنوان الخطوة</label>
+                            <input
+                              type="text"
+                              value={newStepTitle}
+                              onChange={(e) => setNewStepTitle(e.target.value)}
+                              placeholder="مثال: التقييم المبدئي"
+                              className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 block mb-1">وصف الخطوة</label>
+                            <textarea
+                              value={newStepDesc}
+                              onChange={(e) => setNewStepDesc(e.target.value)}
+                              rows={2}
+                              placeholder="وصف مختصر للخطوة..."
+                              className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none text-xs dark:text-white font-bold"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddStep}
+                            className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition"
+                          >
+                            تأكيد إضافة الخطوة
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Steps List */}
+                      <div className="space-y-2">
+                        {tempJourneySteps.map((step, idx) => (
+                          <div key={step.id} className="p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl flex items-start justify-between gap-2">
+                            {editingStepId === step.id ? (
+                              <div className="w-full space-y-2">
+                                <input
+                                  type="text"
+                                  value={editingStepTitle}
+                                  onChange={(e) => setEditingStepTitle(e.target.value)}
+                                  className="w-full bg-white dark:bg-[#12121A] border rounded px-2 py-1 text-xs font-bold dark:text-white"
+                                />
+                                <textarea
+                                  value={editingStepDesc}
+                                  onChange={(e) => setEditingStepDesc(e.target.value)}
+                                  rows={2}
+                                  className="w-full bg-white dark:bg-[#12121A] border rounded px-2 py-1 text-xs dark:text-white"
+                                />
+                                <div className="flex gap-1">
+                                  <button type="button" onClick={() => handleSaveEditStep(step.id)} className="px-2.5 py-1 bg-green-500 text-white text-xs rounded font-bold">حفظ</button>
+                                  <button type="button" onClick={() => setEditingStepId(null)} className="px-2.5 py-1 bg-gray-300 dark:bg-gray-700 text-xs rounded font-bold">إلغاء</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-start gap-2 flex-1">
+                                  <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                    {idx + 1}
+                                  </span>
+                                  <div>
+                                    <h6 className="text-xs font-bold text-gray-900 dark:text-white">{step.title}</h6>
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-400">{step.desc}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button type="button" onClick={() => handleStartEditStep(step)} className="p-1 text-blue-500"><Edit2 className="w-3.5 h-3.5" /></button>
+                                  <button type="button" onClick={() => handleDeleteStep(step.id)} className="p-1 text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 md:col-span-2 border-t border-gray-100 dark:border-[#2D2D3D] pt-4">
                     <h4 className="text-xs font-black text-amber-500">إعدادات قسم الأسئلة الشائعة (FAQ)</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -2753,6 +3470,181 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                           className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
                         />
                       </div>
+                    </div>
+
+                    {/* Dynamic FAQ List Management */}
+                    <div className="bg-sky-50/40 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/30 rounded-2xl p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <HelpCircle className="w-5 h-5 text-[#00B4D8] dark:text-[#D4AF37]" />
+                          <div>
+                            <h5 className="text-sm font-bold text-gray-900 dark:text-white">إدارة قائمة الأسئلة والإجابات الشائعة</h5>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">يمكنك إضافة أسئلة جديدة، تعديل الأسئلة الحالية، أو تغيير ترتيبها</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingFaq(!isAddingFaq)}
+                          className="text-xs bg-[#00B4D8] hover:bg-[#0077B6] dark:bg-[#D4AF37] dark:hover:bg-[#B8860B] text-white font-bold py-1.5 px-3 rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>إضافة سؤال جديد</span>
+                        </button>
+                      </div>
+
+                      {/* Add FAQ Form */}
+                      {isAddingFaq && (
+                        <div className="bg-white dark:bg-[#12121A] p-4 rounded-xl border border-sky-200 dark:border-sky-800/50 space-y-3 animate-fadeIn">
+                          <h6 className="text-xs font-bold text-gray-800 dark:text-gray-200">إضافة سؤال جديد إلى القائمة</h6>
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 block mb-1">السؤال:</label>
+                            <input
+                              type="text"
+                              value={newFaqQ}
+                              onChange={(e) => setNewFaqQ(e.target.value)}
+                              placeholder="مثال: كيف أستطيع شحن محفظتي بسرعة؟"
+                              className="w-full bg-gray-50 dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 text-xs font-medium dark:text-white outline-none focus:border-[#00B4D8]"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 block mb-1">الإجابة:</label>
+                            <textarea
+                              rows={3}
+                              value={newFaqA}
+                              onChange={(e) => setNewFaqA(e.target.value)}
+                              placeholder="اكتب الإجابة التفصيلية هنا..."
+                              className="w-full bg-gray-50 dark:bg-[#1A1A24] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-3 py-2 text-xs font-medium dark:text-white outline-none focus:border-[#00B4D8]"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddingFaq(false);
+                                setNewFaqQ('');
+                                setNewFaqA('');
+                              }}
+                              className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 font-bold"
+                            >
+                              إلغاء
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAddFaq}
+                              className="px-4 py-1.5 bg-[#00B4D8] hover:bg-[#0077B6] dark:bg-[#D4AF37] text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>إضافة السؤال</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* List of current FAQs */}
+                      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                        {tempFaqs.length === 0 ? (
+                          <div className="text-center py-6 text-gray-400 text-xs font-medium">
+                            لا توجد أسئلة شائعة مخصصة حالياً. اضغط على "إضافة سؤال جديد" للبدء.
+                          </div>
+                        ) : (
+                          tempFaqs.map((faq, index) => (
+                            <div
+                              key={faq.id || index}
+                              className="bg-white dark:bg-[#1A1A24] p-3 rounded-xl border border-gray-200 dark:border-[#2D2D3D] space-y-2 transition-all hover:border-[#00B4D8]/40"
+                            >
+                              {editingFaqId === faq.id ? (
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">السؤال:</label>
+                                    <input
+                                      type="text"
+                                      value={editingFaqQ}
+                                      onChange={(e) => setEditingFaqQ(e.target.value)}
+                                      className="w-full bg-gray-50 dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-2.5 py-1.5 text-xs font-bold dark:text-white outline-none focus:border-[#00B4D8]"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">الإجابة:</label>
+                                    <textarea
+                                      rows={3}
+                                      value={editingFaqA}
+                                      onChange={(e) => setEditingFaqA(e.target.value)}
+                                      className="w-full bg-gray-50 dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-lg px-2.5 py-1.5 text-xs font-medium dark:text-white outline-none focus:border-[#00B4D8]"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2 justify-end pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingFaqId(null)}
+                                      className="px-2.5 py-1 text-xs text-gray-500 font-bold"
+                                    >
+                                      إلغاء
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveEditFaq(faq.id)}
+                                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>حفظ التعديل</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded-full bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] text-[10px] font-black flex items-center justify-center shrink-0">
+                                        {index + 1}
+                                      </span>
+                                      <h6 className="text-xs font-extrabold text-gray-900 dark:text-white">{faq.q}</h6>
+                                    </div>
+                                    <p className="text-[11px] text-gray-600 dark:text-gray-300 pr-7 leading-relaxed whitespace-pre-line">{faq.a}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveFaq(index, 'up')}
+                                      disabled={index === 0}
+                                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 cursor-pointer"
+                                      title="تحريك لأعلى"
+                                    >
+                                      <ArrowUpDown className="w-3.5 h-3.5 rotate-180" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveFaq(index, 'down')}
+                                      disabled={index === tempFaqs.length - 1}
+                                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-30 cursor-pointer"
+                                      title="تحريك لأسفل"
+                                    >
+                                      <ArrowUpDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditFaq(faq)}
+                                      className="p-1 text-blue-500 hover:text-blue-700 dark:text-blue-400 cursor-pointer"
+                                      title="تعديل السؤال"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteFaq(faq.id)}
+                                      className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                      title="حذف السؤال"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
                     {/* Custom Payment Methods */}
                     <div className="bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl p-4">
                       <div className="flex items-center justify-between mb-4">
@@ -2879,6 +3771,25 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                           className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl px-3 py-2 outline-none focus:border-[#00B4D8] dark:text-white font-bold text-xs"
                           dir="ltr"
                         />
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-900/10 p-3 rounded-xl border border-green-100 dark:border-green-800/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-[10px] font-bold text-green-700 dark:text-green-400">تفعيل زر واتساب العائم</label>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="isFloatingWhatsappEnabled" value="true" defaultChecked={platformSettings.isFloatingWhatsappEnabled} className="sr-only peer" />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-green-500"></div>
+                          </label>
+                        </div>
+                        <label className="text-[10px] font-bold text-gray-500 block mb-1">رقم الواتساب للزر العائم</label>
+                        <input
+                          type="text"
+                          name="floatingWhatsappNumber"
+                          defaultValue={platformSettings.floatingWhatsappNumber}
+                          placeholder="مثال: 201001234567"
+                          className="w-full bg-white dark:bg-[#12121A] border border-green-200 dark:border-green-800/30 rounded-xl px-3 py-2 outline-none focus:border-green-500 dark:text-white font-bold text-xs"
+                          dir="ltr"
+                        />
+                        <p className="text-[9px] text-gray-400 mt-1">أدخل الرقم بالصيغة الدولية بدون علامة + (مثال: 201001234567)</p>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-gray-500 block mb-1">البريد الإلكتروني للدعم</label>
@@ -3139,9 +4050,75 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
                     </div>
                   </div>
                 </div>
-              </div>
 
-            </div>
+              {/* Dynamic Legal Pages Card */}
+              <div className="bg-gray-50/50 dark:bg-[#0D0D12]/30 p-6 rounded-2xl border border-gray-150 dark:border-[#2D2D3D] md:col-span-2 space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-200/60 dark:border-[#2D2D3D] pb-3">
+                  <h3 className="text-base font-black text-gray-800 dark:text-white flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-indigo-500" />
+                    <span>إدارة الصفحات القانونية والسياسات</span>
+                  </h3>
+                  <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1 rounded-full border border-indigo-200/40 dark:border-indigo-800/40">
+                    محتوى ديناميكي للفوتر
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5">
+                  {/* 1. Privacy Policy */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-[#00B4D8]" />
+                      <span>سياسة الخصوصية والأمان</span>
+                    </label>
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      المحتوى الذي سيظهر للطالب عند النقر على "سياسة الخصوصية والأمان" في الفوتر.
+                    </p>
+                    <textarea
+                      name="privacyPolicyText"
+                      rows={6}
+                      defaultValue={platformSettings.privacyPolicyText}
+                      placeholder="اكتب سياسة الخصوصية والأمان هنا..."
+                      className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl p-3 outline-none focus:border-[#00B4D8] dark:text-white font-medium text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  {/* 2. Terms and Conditions */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <span>الشروط والأحكام العامة</span>
+                    </label>
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      المحتوى الذي سيظهر للطالب عند النقر على "الشروط والأحكام العامة" في الفوتر.
+                    </p>
+                    <textarea
+                      name="termsConditionsText"
+                      rows={6}
+                      defaultValue={platformSettings.termsConditionsText}
+                      placeholder="اكتب الشروط والأحكام العامة هنا..."
+                      className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl p-3 outline-none focus:border-emerald-500 dark:text-white font-medium text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  {/* 3. Intellectual Property */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-purple-500" />
+                      <span>حقوق الملكية الفكرية</span>
+                    </label>
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      المحتوى الذي سيظهر للطالب عند النقر على "حقوق الملكية الفكرية" في الفوتر.
+                    </p>
+                    <textarea
+                      name="intellectualPropertyText"
+                      rows={6}
+                      defaultValue={platformSettings.intellectualPropertyText}
+                      placeholder="اكتب حقوق الملكية الفكرية وحماية المحتوى هنا..."
+                      className="w-full bg-white dark:bg-[#12121A] border border-gray-200 dark:border-[#2D2D3D] rounded-xl p-3 outline-none focus:border-purple-500 dark:text-white font-medium text-xs leading-relaxed"
+                    />
+                  </div>
+                </div>
+              </div>
 
             {/* Action Save Button */}
             <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-[#2D2D3D]">
@@ -3170,9 +4147,11 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
-              className={`overflow-auto max-h-[600px] relative rounded-2xl border border-gray-100 dark:border-[#2D2D3D]/50 scrollbar-thin ${(activeTab === 'payments' || activeTab === 'subscription_requests') ? 'p-6 bg-gray-50/30 dark:bg-[#0D0D12]/30' : ''}`}
+              className={`overflow-auto max-h-[600px] relative rounded-2xl border border-gray-100 dark:border-[#2D2D3D]/50 scrollbar-thin ${(activeTab === 'payments' || activeTab === 'subscription_requests' || activeTab === 'support_requests') ? 'p-6 bg-gray-50/30 dark:bg-[#0D0D12]/30' : ''}`}
             >
-              {activeTab === 'subscription_requests' ? (
+              {activeTab === 'support_requests' ? (
+                <SupportRequestsAdmin />
+              ) : activeTab === 'subscription_requests' ? (
                 <SubscriptionRequests adminUserData={userData} />
               ) : activeTab === 'special_approvals' ? (
                 <div className="space-y-6 animate-in fade-in duration-300">

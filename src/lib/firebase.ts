@@ -5,9 +5,7 @@ import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 export const app = initializeApp(firebaseConfig);
-const targetDbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== 'teachland-db') 
-  ? firebaseConfig.firestoreDatabaseId 
-  : (typeof window !== 'undefined' && window.atob ? window.atob('YWktc3R1ZGlvLTViZGJkZTdmLTI3ZTctNDBjYS1iMWQ0LTBjY2M0MzJhOGZjOA==') : Buffer.from('YWktc3R1ZGlvLTViZGJkZTdmLTI3ZTctNDBjYS1iMWQ0LTBjY2M0MzJhOGZjOA==', 'base64').toString('utf-8'));
+const targetDbId = 'ai-studio-5bdbde7f-27e7-40ca-b1d4-0ccc432a8fc8';
 
 export const db = getFirestore(app, targetDbId);
 export const auth = getAuth(app);

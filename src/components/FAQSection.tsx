@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { usePlatformSettings } from '../context/PlatformSettingsContext';
 
-const faqs = [
+const defaultFaqs = [
   {
     question: "كيف يمكنني الوصول إلى الكورسات التي اشتركت بها؟",
     answer: "يمكنك الوصول إلى الكورسات التي اشتركت بها من خلال قسم 'موادي' في القائمة الجانبية أو السفلية. ستجد هناك جميع الكورسات الخاصة بك."
@@ -25,7 +26,12 @@ const faqs = [
 ];
 
 export default function FAQSection() {
+  const { settings } = usePlatformSettings();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const activeFaqs = (settings.customFaqs && settings.customFaqs.length > 0)
+    ? settings.customFaqs.map(f => ({ question: f.q, answer: f.a }))
+    : defaultFaqs;
 
   const toggleOpen = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
@@ -34,12 +40,12 @@ export default function FAQSection() {
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="mb-8">
-        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2">الأسئلة الشائعة</h2>
-        <p className="text-gray-600 dark:text-gray-400">إجابات سريعة للأسئلة الأكثر شيوعاً لمساعدتك في استخدام المنصة.</p>
+        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2">{settings.faqTitle || 'الأسئلة الشائعة'}</h2>
+        <p className="text-gray-600 dark:text-gray-400">{settings.faqSubtitle || 'إجابات سريعة للأسئلة الأكثر شيوعاً لمساعدتك في استخدام المنصة.'}</p>
       </div>
 
       <div className="space-y-4">
-        {faqs.map((faq, index) => (
+        {activeFaqs.map((faq, index) => (
           <div 
             key={index} 
             className="bg-white dark:bg-[#1A1A24] rounded-2xl border border-gray-200 dark:border-[#2D2D3D] overflow-hidden"
@@ -57,7 +63,7 @@ export default function FAQSection() {
             </button>
             
             {openIndex === index && (
-              <div className="px-6 pb-4 pt-2 border-t border-gray-100 dark:border-[#2D2D3D] bg-gray-50 dark:bg-[#222230]/30 text-gray-600 dark:text-gray-300 leading-relaxed">
+              <div className="px-6 pb-4 pt-2 border-t border-gray-100 dark:border-[#2D2D3D] bg-gray-50 dark:bg-[#222230]/30 text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
                 {faq.answer}
               </div>
             )}

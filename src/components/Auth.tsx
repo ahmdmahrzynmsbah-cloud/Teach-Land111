@@ -106,11 +106,11 @@ export default function Auth() {
         let userCredential;
         if (email === 'ahmed@admin.com' && (password === '1234' || password === '123456' || password === '١٢٣٤')) {
           try {
-            userCredential = await signInWithEmailAndPassword(auth, email, '123456');
+            userCredential = await signInWithEmailAndPassword(auth, email, password);
           } catch (error: any) {
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
               try {
-                userCredential = await createUserWithEmailAndPassword(auth, email, '123456');
+                userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 try {
                   await setDoc(doc(db, 'users', userCredential.user.uid), {
                     email,
@@ -122,12 +122,11 @@ export default function Auth() {
                   console.error("Firestore error creating admin:", dbError);
                 }
               } catch (createError: any) {
-                if (createError.code === 'auth/email-already-in-use') {
-                   // If it already exists but 123456 failed, try the typed password just in case they changed it
-                   userCredential = await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                   throw createError;
-                }
+                 if (createError.code === 'auth/email-already-in-use') {
+                    userCredential = await signInWithEmailAndPassword(auth, email, password);
+                 } else {
+                    throw createError;
+                 }
               }
             } else {
               throw error;
@@ -252,19 +251,20 @@ export default function Auth() {
               where('role', '==', 'student'),
               where('grade', 'in', finalGrades)
             );
-            const studentsSnap = await getDocs(studentsQuery);
-            const notificationPromises = studentsSnap.docs.map(studentDoc => {
-              return addDoc(collection(db, 'notifications'), {
-                userId: studentDoc.id,
-                title: 'معلّم جديد انضم لتخصّصك! 👨‍🏫',
-                message: `انضم الأستاذ ${teacherName} لتدريس مادة ${teacherSubject} لصفك الدراسي. يمكنك الآن استكشاف كورساته ومحاضراته!`,
-                type: 'new_teacher_alert',
-                read: false,
-                createdAt: new Date().toISOString(),
-                teacherId: user.uid
+            getDocs(studentsQuery).then((studentsSnap) => {
+              const notificationPromises = studentsSnap.docs.map(studentDoc => {
+                return addDoc(collection(db, 'notifications'), {
+                  userId: studentDoc.id,
+                  title: 'معلّم جديد انضم لتخصّصك! 👨‍🏫',
+                  message: `انضم الأستاذ ${teacherName} لتدريس مادة ${teacherSubject} لصفك الدراسي. يمكنك الآن استكشاف كورساته ومحاضراته!`,
+                  type: 'new_teacher_alert',
+                  read: false,
+                  createdAt: new Date().toISOString(),
+                  teacherId: user.uid
+                });
               });
-            });
-            await Promise.all(notificationPromises);
+              Promise.all(notificationPromises).catch(console.error);
+            }).catch(console.error);
           } catch (notifErr) {
             console.error("Error creating notifications for new teacher:", notifErr);
           }

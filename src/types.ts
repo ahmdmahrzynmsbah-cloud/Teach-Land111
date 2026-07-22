@@ -5,6 +5,32 @@ export interface CustomPaymentMethod {
   isEnabled: boolean;
 }
 
+export interface FAQItem {
+  id: string;
+  q: string;
+  a: string;
+}
+
+export interface FeatureCardItem {
+  id: string;
+  iconName: string;
+  title: string;
+  desc: string;
+}
+
+export interface JourneyStepItem {
+  id: string;
+  title: string;
+  desc: string;
+}
+
+export interface StatCounterItem {
+  id: string;
+  value: number;
+  suffix: string;
+  label: string;
+}
+
 export interface PlatformSettings {
   platformName: string;
   logoChar: string;
@@ -17,6 +43,14 @@ export interface PlatformSettings {
   showFaqSection: boolean;
   gradesTitle: string;
   gradesSubtitle: string;
+  featuresBadge?: string;
+  featuresTitle?: string;
+  featuresSubtitle?: string;
+  featuresListTitle?: string;
+  featuresList?: FeatureCardItem[];
+  journeyTitle?: string;
+  journeySteps?: JourneyStepItem[];
+  statsCounters?: StatCounterItem[];
   subjectsTitle: string;
   subjectsSubtitle: string;
   faqTitle: string;
@@ -29,7 +63,10 @@ export interface PlatformSettings {
   isBankAccountEnabled?: boolean;
   customPaymentMethods?: CustomPaymentMethod[];
   subjects?: { id: string; title: string; iconName: string; color: string }[];
+  customFaqs?: FAQItem[];
   contactPhone?: string;
+  floatingWhatsappNumber?: string;
+  isFloatingWhatsappEnabled?: boolean;
   contactEmail?: string;
   contactAddress?: string;
   socialLinks?: {
@@ -51,6 +88,9 @@ export interface PlatformSettings {
   heroVideoProvider?: 'bunny' | 'tiktok' | 'youtube' | 'direct';
   heroVideoTitle?: string;
   heroVideoPoster?: string;
+  privacyPolicyText?: string;
+  termsConditionsText?: string;
+  intellectualPropertyText?: string;
 }
 
 export interface User {
@@ -292,5 +332,37 @@ export interface QuduratReview {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface SupportRequest {
+  id?: string;
+  name: string;
+  emailOrPhone: string;
+  message: string;
+  status: 'pending' | 'resolved';
+  createdAt: any; // Firestore Timestamp
+}
+
+export interface ChatMessage {
+  id?: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'admin' | 'teacher' | 'student' | 'parent' | 'sub_admin' | 'developer';
+  senderAvatar?: string;
+  
+  recipientType: 'all' | 'role_group' | 'course' | 'admin' | 'user' | 'teacher';
+  targetRole?: 'student' | 'teacher' | 'parent';
+  targetCourseId?: string;
+  targetCourseTitle?: string;
+  recipientId?: string;
+  recipientName?: string;
+  recipientIds?: string[];
+  recipientNames?: string[];
+  
+  title?: string;
+  content: string;
+  createdAt: string | number;
+  readBy?: string[];
+}
+
 
 

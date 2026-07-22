@@ -2,7 +2,7 @@ import React from "react";
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Lock, ArrowRight, Plus, Trash2, Video, BookOpen, Clock, Edit2, X, Upload, Star, AlertTriangle, FileText, Save, Check, Loader2, History, Award, Calendar, Download, Sparkles, Heart, ThumbsUp, MessageSquare, Reply, Send, ShieldAlert, Copy, Wallet } from 'lucide-react';
+import { Play, Lock, ArrowRight, Plus, Trash2, Video, BookOpen, Clock, Edit2, X, Upload, Star, AlertTriangle, FileText, Save, Check, Loader2, History, Award, Calendar, Download, Sparkles, Heart, ThumbsUp, MessageSquare, Reply, Send, ShieldAlert, Copy, Wallet, GraduationCap, Shield, Users } from 'lucide-react';
 import { doc, getDoc, updateDoc, arrayUnion, increment, collection, query, where, getDocs, setDoc, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType, logVideoLink } from '../lib/firebase';
 import { User, Course, Lesson, Review, LessonNote } from '../types';
@@ -1258,7 +1258,37 @@ export default function CourseDetails() {
             </Link>
             <h1 className="font-black text-xl text-gray-900 dark:text-white truncate max-w-[200px] md:max-w-md">{course.title}</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            {userData?.role && (
+              <div 
+                title={`أنت مسجل حالياً كـ ${userData.role === 'student' ? 'طالب' : userData.role === 'teacher' ? 'معلم' : userData.role === 'parent' ? 'ولي أمر' : 'إدارة'}`}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full text-xs font-black shadow-sm border transition-all ${
+                  userData.role === 'student'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : userData.role === 'teacher'
+                    ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                    : (userData.role as any) === 'admin' || (userData.role as any) === 'sub_admin' || (userData.role as any) === 'developer'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                    : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                }`}
+              >
+                {userData.role === 'student' && <GraduationCap className="w-3.5 h-3.5 shrink-0" />}
+                {userData.role === 'teacher' && <Award className="w-3.5 h-3.5 shrink-0" />}
+                {(userData.role as any) === 'admin' || (userData.role as any) === 'sub_admin' || (userData.role as any) === 'developer' && <Shield className="w-3.5 h-3.5 shrink-0" />}
+                {userData.role === 'parent' && <Users className="w-3.5 h-3.5 shrink-0" />}
+                
+                <span className="flex items-center gap-1">
+                  <span className="text-[10px] opacity-70 hidden sm:inline">مسجل كـ:</span>
+                  <span>
+                    {userData.role === 'student' && 'طالب'}
+                    {userData.role === 'teacher' && 'معلم'}
+                    {((userData.role as any) === 'admin' || (userData.role as any) === 'sub_admin' || (userData.role as any) === 'developer') && 'إدارة'}
+                    {userData.role === 'parent' && 'ولي أمر'}
+                  </span>
+                </span>
+                <span className="w-2 h-2 rounded-full animate-pulse bg-current"></span>
+              </div>
+            )}
             <div className="hidden md:flex items-center gap-2 text-sm font-bold bg-[#00B4D8]/10 dark:bg-[#D4AF37]/10 text-[#00B4D8] dark:text-[#D4AF37] px-4 py-2 rounded-full">
               <BookOpen className="w-4 h-4" />
               {course.subject} - {course.grade}
