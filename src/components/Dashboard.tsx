@@ -2018,6 +2018,14 @@ export default function Dashboard() {
                       {(userData.role === 'admin' || userData.role === 'sub_admin' || userData.role === 'developer') && 'إدارة'}
                       {userData.role === 'parent' && 'ولي أمر'}
                     </span>
+                    {userData.name && (
+                      <>
+                        <span className="mx-1 opacity-50">-</span>
+                        <span className="opacity-90 truncate max-w-[80px] sm:max-w-[120px] md:max-w-[180px]">
+                          {userData.name}
+                        </span>
+                      </>
+                    )}
                   </span>
                   <span className="w-2 h-2 rounded-full animate-pulse bg-current"></span>
                 </div>
