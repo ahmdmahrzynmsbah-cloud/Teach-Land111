@@ -1,5 +1,4 @@
-
-import { ref, uploadString, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
 import toast from 'react-hot-toast';
 
@@ -47,17 +46,52 @@ export async function compressImageToBase64(file: File, maxWidth?: number, maxHe
   });
 }
 
-async function fetchWithTimeout(resource: string, options: any, timeout = 30000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(resource, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
-  }
+function uploadViaXhr(
+  file: File,
+  endpoint: string,
+  onProgress: (progress: number) => void,
+  timeoutMs = 300000
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        const percent = Math.min(Math.round((event.loaded / event.total) * 98), 98);
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.url) {
+            onProgress(100);
+            resolve(data.url);
+            return;
+          } else if (data.videoId) {
+            onProgress(100);
+            resolve(`bunny:${data.videoId}`);
+            return;
+          }
+        } catch (e) {
+          reject(new Error('تنسيق استجابة السيرفر غير صحيح'));
+          return;
+        }
+      }
+      reject(new Error(`خطأ من السيرفر (${xhr.status})`));
+    };
+
+    xhr.onerror = () => reject(new Error('خطأ في الاتصال بالشبكة أثناء الرفع'));
+    xhr.ontimeout = () => reject(new Error('انتهت مهلة طلب الرفع'));
+
+    xhr.timeout = timeoutMs;
+    xhr.open('POST', endpoint, true);
+    xhr.send(formData);
+  });
 }
 
 export async function uploadFileToFirebase(
@@ -79,8 +113,60 @@ export async function uploadFileToFirebase(
     throw new Error(errorMsg);
   }
 
-  // Fast direct server chunked upload
-  return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false });
+  onProgress(5);
+
+  // Try direct fast upload first for non-video or files under 50MB
+  if (!originalFile.type.startsWith('video/') && originalFile.size <= 50 * 1024 * 1024) {
+    try {
+      return await uploadViaXhr(originalFile, '/api/upload', onProgress);
+    } catch (err) {
+      console.warn("Direct upload failed, switching to chunked upload:", err);
+    }
+  }
+
+  // Fallback or large video files use chunked upload
+  return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: options?.bunny });
+}
+
+function uploadChunkViaXhr(
+  chunk: Blob,
+  fileId: string,
+  chunkIndex: number,
+  onChunkProgress: (loaded: number, total: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('chunkIndex', chunkIndex.toString());
+    formData.append('fileId', fileId);
+    formData.append('chunk', chunk, `chunk-${chunkIndex}.bin`);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onChunkProgress(event.loaded, event.total);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          if (res.success) {
+            resolve();
+            return;
+          }
+        } catch (e) {}
+      }
+      reject(new Error(`فشل رفع جزء الملف رقم ${chunkIndex}`));
+    };
+
+    xhr.onerror = () => reject(new Error('خطأ في الشبكة أثناء رفع جزء الملف'));
+    xhr.ontimeout = () => reject(new Error('انتهت مهلة رفع جزء الملف'));
+
+    xhr.timeout = 120000; // 2 minutes timeout per chunk
+    xhr.open('POST', '/api/upload-chunk', true);
+    xhr.send(formData);
+  });
 }
 
 export async function uploadChunkedFile(
@@ -92,8 +178,7 @@ export async function uploadChunkedFile(
   const useBunny = options?.bunny !== undefined ? options.bunny : isVideo;
 
   try {
-    // 2MB chunks for fast parallel transmission
-    const chunkSize = 2 * 1024 * 1024; 
+    const chunkSize = 1 * 1024 * 1024; // 1MB chunks for max reliability
     const totalChunks = Math.ceil(file.size / chunkSize);
     const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
@@ -101,38 +186,30 @@ export async function uploadChunkedFile(
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, file.size);
       const chunk = file.slice(start, end);
-      
-      const formData = new FormData();
-      formData.append('chunkIndex', i.toString());
-      formData.append('fileId', fileId);
-      formData.append('chunk', chunk, `chunk-${i}.bin`);
-      
+
       let chunkSuccess = false;
       let retries = 3;
-      
+
       while (!chunkSuccess && retries > 0) {
         try {
-          const response = await fetchWithTimeout('/api/upload-chunk', {
-            method: 'POST',
-            body: formData,
-          }, 15000); // 15 seconds timeout per chunk
-          
-          if (!response.ok) {
-            throw new Error(`Chunk upload failed: ${response.status}`);
-          }
+          await uploadChunkViaXhr(chunk, fileId, i, (loaded, total) => {
+            const currentChunkProgress = (loaded / total) * (1 / totalChunks);
+            const overallPercent = Math.min(Math.round(((i / totalChunks) + currentChunkProgress) * 90), 92);
+            onProgress(overallPercent);
+          });
           chunkSuccess = true;
         } catch (err) {
           retries--;
-          console.warn(`Chunk ${i} failed, retrying... (${retries} left)`, err);
+          console.warn(`Chunk ${i} upload error, retrying... (${retries} left)`, err);
           if (retries === 0) throw err;
           await new Promise(r => setTimeout(r, 1000));
         }
       }
-      
-      onProgress(Math.min(Math.round(((i + 1) / totalChunks) * 90), 95));
     }
 
-    const mergeResponse = await fetchWithTimeout('/api/upload-merge', {
+    onProgress(93);
+
+    const response = await fetch('/api/upload-merge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -141,13 +218,13 @@ export async function uploadChunkedFile(
         originalName: file.name,
         bunny: useBunny,
       }),
-    }, 60000);
+    });
 
-    if (!mergeResponse.ok) {
-      throw new Error('Merge failed');
+    if (!response.ok) {
+      throw new Error('Merge request failed');
     }
 
-    const data = await mergeResponse.json();
+    const data = await response.json();
     if (data.videoId) {
       onProgress(100);
       return `bunny:${data.videoId}`;
@@ -155,10 +232,21 @@ export async function uploadChunkedFile(
       onProgress(100);
       return data.url;
     }
-    
-    throw new Error('Invalid response from server');
+
+    throw new Error('Invalid merge response');
   } catch (err) {
     console.error("Chunked upload failed:", err);
+
+    // Emergency Fallback for small files (< 10MB): Base64
+    if (file.size <= 10 * 1024 * 1024) {
+      try {
+        console.warn("Attempting emergency base64 upload fallback...");
+        return await uploadViaBase64(file, onProgress);
+      } catch (e) {
+        console.error("Base64 fallback failed:", e);
+      }
+    }
+
     throw new Error('فشل رفع الملف. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
   }
 }
