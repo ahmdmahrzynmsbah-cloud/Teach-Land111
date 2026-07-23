@@ -325,7 +325,15 @@ export async function uploadFileToFirebase(
     }
   }
 
-  // 1. Try direct local Express server upload first
+  // 1. Priority: Direct Firebase Storage Upload (Most robust)
+  try {
+    const firebaseUrl = await uploadViaFirebase(file, onProgress);
+    if (firebaseUrl) return firebaseUrl;
+  } catch (fbErr) {
+    console.warn('Firebase Storage upload failed, attempting local server fallback...', fbErr);
+  }
+
+  // 2. Try direct local Express server upload
   try {
     const localUrl = await uploadViaLocalExpress(file, onProgress);
     if (localUrl) return localUrl;
@@ -333,9 +341,9 @@ export async function uploadFileToFirebase(
     console.warn('Direct Express upload failed, attempting Express chunked upload fallback...', err);
   }
 
-  // 2. Try Express Chunked upload (500KB chunks - highly resilient for large PDFs/videos)
+  // 3. Try Express Chunked upload
   try {
-    const chunkSize = 500 * 1024; // 500KB chunks
+    const chunkSize = 500 * 1024;
     const totalChunks = Math.ceil(file.size / chunkSize);
     const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
@@ -380,18 +388,10 @@ export async function uploadFileToFirebase(
       }
     }
   } catch (chunkErr) {
-    console.warn('Chunked upload failed, attempting Firebase Storage fallback...', chunkErr);
+    console.warn('Chunked upload failed:', chunkErr);
   }
 
-  // 3. Try Firebase Storage
-  try {
-    const firebaseUrl = await uploadViaFirebase(file, onProgress);
-    if (firebaseUrl) return firebaseUrl;
-  } catch (fbErr) {
-    console.warn('Firebase Storage upload failed:', fbErr);
-  }
-
-  // 4. Emergency fallback ONLY for small files <= 300KB (e.g., small logo/avatar)
+  // 4. Emergency fallback ONLY for small files <= 300KB
   if (file.size <= 300 * 1024) {
     return await uploadViaBase64(file, onProgress);
   }
