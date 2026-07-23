@@ -231,8 +231,10 @@ function uploadViaFirebase(
       uploadTask.on(
         'state_changed',
         (snapshot) => {
-          hasMadeProgress = true;
-          clearTimeout(timeoutTimer);
+          if (snapshot.bytesTransferred > 0) {
+            hasMadeProgress = true;
+            clearTimeout(timeoutTimer);
+          }
           if (snapshot.totalBytes > 0) {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
             onProgress(Math.min(progress, 99));
