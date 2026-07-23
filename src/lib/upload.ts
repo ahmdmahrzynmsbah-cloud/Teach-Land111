@@ -287,6 +287,15 @@ export async function uploadFileToFirebase(
   onProgress: (progress: number) => void = () => {},
   options?: UploadOptions
 ): Promise<string> {
+  // Delegate all uploads to the highly reliable chunked upload system
+  return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false });
+}
+
+async function uploadFileToFirebase_OLD(
+  originalFile: File,
+  onProgress: (progress: number) => void = () => {},
+  options?: UploadOptions
+): Promise<string> {
   if (!originalFile) {
     const errorMsg = 'لم يتم تحديد أي ملف للرفع.';
     toast.error(errorMsg);
@@ -412,10 +421,10 @@ export async function uploadChunkedFile(
   const isVideo = file.type.startsWith('video/');
   const useBunny = options?.bunny !== undefined ? options.bunny : isVideo;
 
-  // If it's a PDF or non-video document or bunny is false, use direct fast upload
-  if (!useBunny || !isVideo) {
-    return await uploadFileToFirebase(file, onProgress, options);
-  }
+  // We will use chunked upload for ALL files (videos, PDFs, images) for maximum reliability
+  // if (!useBunny || !isVideo) {
+  //   return await uploadFileToFirebase(file, onProgress, options);
+  // }
 
   // Stage 1: Express API chunked upload (for large videos / Bunny CDN processing)
   try {
