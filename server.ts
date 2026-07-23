@@ -96,17 +96,56 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '1024mb', extended: true }));
 
   // API Route for upload
-  app.post('/api/upload', upload.single('file'), async (req, res) => {
-    if (!req.file) {
-      res.status(400).json({ error: 'No file uploaded.' });
-      return;
-    }
-    
-    await applyFaststart(req.file.path);
+  app.post('/api/upload', (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) {
+        console.error('Multer upload error:', err);
+        return res.status(400).json({ error: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req, res) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded.' });
+        return;
+      }
+      
+      await applyFaststart(req.file.path);
 
-    // Return the URL to the uploaded file
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
+      // Return the URL to the uploaded file
+      const fileUrl = `/uploads/${req.file.filename}`;
+      res.json({ success: true, url: fileUrl });
+    } catch (err: any) {
+      console.error('Error handling /api/upload:', err);
+      res.status(500).json({ error: err.message || 'Upload processing failed' });
+    }
+  });
+
+  // API Route for Base64 Upload
+  app.post('/api/upload-base64', express.json({ limit: '100mb' }), (req, res) => {
+    try {
+      const { base64, filename } = req.body;
+      if (!base64 || !filename) {
+        res.status(400).json({ error: 'Missing base64 or filename' });
+        return;
+      }
+      const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      let buffer: Buffer;
+      if (matches && matches.length === 3) {
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        buffer = Buffer.from(base64, 'base64');
+      }
+      const safeName = filename.replace(/[^a-zA-Z0-9.]/g, '_');
+      const finalFilename = `${Date.now()}-${Math.round(Math.random() * 1E9)}-${safeName}`;
+      const finalPath = path.join(uploadDir, finalFilename);
+      fs.writeFileSync(finalPath, buffer);
+      res.json({ success: true, url: `/uploads/${finalFilename}` });
+    } catch (err: any) {
+      console.error('Base64 upload error:', err);
+      res.status(500).json({ error: err.message || 'Failed to save base64 file' });
+    }
   });
 
   // Bunny Stream dynamic library resolution

@@ -115,17 +115,79 @@ export async function uploadFileToFirebase(
 
   onProgress(5);
 
-  // Try direct fast upload first for non-video or files under 50MB
+  // 1. Try direct POST upload first for non-video or files under 50MB
   if (!originalFile.type.startsWith('video/') && originalFile.size <= 50 * 1024 * 1024) {
     try {
       return await uploadViaXhr(originalFile, '/api/upload', onProgress);
     } catch (err) {
-      console.warn("Direct upload failed, switching to chunked upload:", err);
+      console.warn("Direct upload failed, switching to base64 server upload:", err);
     }
   }
 
-  // Fallback or large video files use chunked upload
-  return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: options?.bunny });
+  // 2. Try Base64 JSON Server upload for non-video files under 30MB (very reliable for PDFs)
+  if (!originalFile.type.startsWith('video/') && originalFile.size <= 30 * 1024 * 1024) {
+    try {
+      return await uploadViaBase64Server(originalFile, onProgress);
+    } catch (err) {
+      console.warn("Base64 server upload failed, switching to chunked upload:", err);
+    }
+  }
+
+  // 3. Fallback or large video files use chunked upload
+  try {
+    return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: options?.bunny });
+  } catch (err) {
+    console.warn("Chunked upload failed, trying base64 fallback:", err);
+  }
+
+  // 4. Client Firebase Storage Base64 fallback for small files (< 15MB)
+  if (originalFile.size <= 15 * 1024 * 1024) {
+    try {
+      return await uploadViaBase64(originalFile, onProgress);
+    } catch (err) {
+      console.error("Client base64 fallback failed:", err);
+    }
+  }
+
+  throw new Error('فشل رفع الملف. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
+}
+
+async function uploadViaBase64Server(
+  file: File,
+  onProgress: (progress: number) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      onProgress(30);
+      try {
+        const base64Data = reader.result as string;
+        onProgress(60);
+        const response = await fetch('/api/upload-base64', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64: base64Data,
+            filename: file.name,
+          })
+        });
+        if (!response.ok) {
+          throw new Error('Server base64 upload failed');
+        }
+        const data = await response.json();
+        if (data.url) {
+          onProgress(100);
+          resolve(data.url);
+          return;
+        }
+        reject(new Error('Invalid response from server'));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = () => reject(new Error('Base64 read error'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function uploadChunkViaXhr(
