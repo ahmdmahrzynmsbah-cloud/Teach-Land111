@@ -1,4 +1,6 @@
+import fs from 'fs';
 
+const uploadTs = `
 import { ref, uploadBytesResumable, getDownloadURL, uploadString } from 'firebase/storage';
 import { storage } from './firebase';
 import toast from 'react-hot-toast';
@@ -133,7 +135,7 @@ export async function uploadFileToFirebase(
   const maxLimit = options?.maxSizeBytes || 500 * 1024 * 1024;
   if (file.size > maxLimit) {
     const sizeInMB = (maxLimit / (1024 * 1024)).toFixed(0);
-    const errorMsg = `حجم الملف كبير جداً. الحد الأقصى هو ${sizeInMB} ميجابايت.`;
+    const errorMsg = \`حجم الملف كبير جداً. الحد الأقصى هو \${sizeInMB} ميجابايت.\`;
     toast.error(errorMsg);
     throw new Error(errorMsg);
   }
@@ -185,7 +187,7 @@ export async function uploadChunkedFile(
       const formData = new FormData();
       formData.append('chunkIndex', i.toString());
       formData.append('fileId', fileId);
-      formData.append('chunk', chunk, `chunk-${i}.bin`);
+      formData.append('chunk', chunk, \`chunk-\${i}.bin\`);
       
       const response = await fetch('/api/upload-chunk', {
         method: 'POST',
@@ -193,7 +195,7 @@ export async function uploadChunkedFile(
       });
       
       if (!response.ok) {
-        throw new Error(`Chunk upload failed: ${response.status}`);
+        throw new Error(\`Chunk upload failed: \${response.status}\`);
       }
       
       onProgress(((i + 1) / totalChunks) * 90);
@@ -217,7 +219,7 @@ export async function uploadChunkedFile(
     const data = await mergeResponse.json();
     if (data.videoId) {
       onProgress(100);
-      return `bunny:${data.videoId}`;
+      return \`bunny:\${data.videoId}\`;
     } else if (data.url) {
       onProgress(100);
       return data.url;
@@ -273,7 +275,7 @@ function uploadViaLocalExpress(
           } else reject(new Error("Invalid response"));
         } catch(e) { reject(e); }
       } else {
-        reject(new Error(`Server error ${xhr.status}`));
+        reject(new Error(\`Server error \${xhr.status}\`));
       }
     };
     xhr.onerror = () => {
@@ -296,7 +298,7 @@ function uploadViaFirebase(
   return new Promise((resolve, reject) => {
     try {
       const fileExtension = file.name.split('.').pop() || 'bin';
-      const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+      const fileName = \`uploads/\${Date.now()}-\${Math.random().toString(36).substring(7)}.\${fileExtension}\`;
       const storageRef = ref(storage, fileName);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -353,7 +355,7 @@ async function uploadViaBase64(
       try {
         const base64Data = reader.result as string;
         const fileExtension = file.name.split('.').pop() || 'bin';
-        const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+        const fileName = \`uploads/\${Date.now()}-\${Math.random().toString(36).substring(7)}.\${fileExtension}\`;
         const storageRef = ref(storage, fileName);
         await uploadString(storageRef, base64Data, 'data_url');
         onProgress(90);
@@ -368,3 +370,7 @@ async function uploadViaBase64(
     reader.readAsDataURL(file);
   });
 }
+`;
+
+fs.writeFileSync('src/lib/upload.ts', uploadTs);
+console.log('patched upload.ts with reliable anti-stall version');
