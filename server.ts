@@ -466,20 +466,9 @@ async function startServer() {
             });
           }
         } else {
-          try {
-            console.log("Attempting Firebase Storage upload from server...");
-            const firebaseUrl = await uploadFileToFirebaseServer(finalPath, originalName);
-            
-            // Delete local temp file
-            fs.unlink(finalPath, (err) => {
-              if (err) console.error("Error deleting temp file:", err);
-            });
-            
-            res.json({ url: firebaseUrl });
-          } catch (fbErr: any) {
-            console.warn("Firebase Storage upload failed, falling back to local file path:", fbErr.message || fbErr);
-            res.json({ url: `/uploads/${finalFilename}` });
-          }
+          // Firebase upload server-side is hanging, so we just return the local file URL immediately.
+          // This makes the chunked upload extremely fast and reliable.
+          res.json({ url: `/uploads/${finalFilename}` });
         }
       });
     } catch (err) {

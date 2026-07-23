@@ -92,8 +92,8 @@ export async function uploadChunkedFile(
   const useBunny = options?.bunny !== undefined ? options.bunny : isVideo;
 
   try {
-    // 500KB chunks are very safe and fast enough
-    const chunkSize = 500 * 1024; 
+    // 2MB chunks for much faster upload
+    const chunkSize = 2 * 1024 * 1024; 
     const totalChunks = Math.ceil(file.size / chunkSize);
     const fileId = Date.now().toString() + '-' + Math.random().toString(36).substring(7);
 
