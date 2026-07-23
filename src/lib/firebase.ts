@@ -2,12 +2,21 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
 
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA_CNc0I6__SHRAFCmEP_llclnUIwiJc2k",
+  authDomain: "teachland-e69ee.firebaseapp.com",
+  projectId: "teachland-e69ee",
+  storageBucket: "teachland-e69ee.firebasestorage.app",
+  messagingSenderId: "1011126564456",
+  appId: "1:1011126564456:web:1ca33bef938ddc5eed2ddd",
+  measurementId: "G-G3YEJ3QLSH"
+};
 export const app = initializeApp(firebaseConfig);
-const targetDbId = 'ai-studio-5bdbde7f-27e7-40ca-b1d4-0ccc432a8fc8';
 
-export const db = getFirestore(app, targetDbId);
+
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
