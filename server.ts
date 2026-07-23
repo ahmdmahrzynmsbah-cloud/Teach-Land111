@@ -399,8 +399,19 @@ async function startServer() {
       }
       
       writeStream.end(async () => {
-        fs.rmdirSync(chunkDir);
-        await applyFaststart(finalPath);
+        try {
+          if (fs.existsSync(chunkDir)) {
+            fs.rmSync(chunkDir, { recursive: true, force: true });
+          }
+        } catch (rmErr) {
+          console.warn("Error removing chunkDir:", rmErr);
+        }
+
+        try {
+          await applyFaststart(finalPath);
+        } catch (fsErr) {
+          console.warn("Error in applyFaststart:", fsErr);
+        }
         
         if (bunny) {
           try {
@@ -466,8 +477,6 @@ async function startServer() {
             });
           }
         } else {
-          // Firebase upload server-side is hanging, so we just return the local file URL immediately.
-          // This makes the chunked upload extremely fast and reliable.
           res.json({ url: `/uploads/${finalFilename}` });
         }
       });
