@@ -79,63 +79,8 @@ export async function uploadFileToFirebase(
     throw new Error(errorMsg);
   }
 
-  // First try direct Firebase Storage Upload (fastest and standard for all clients)
-  try {
-    const cleanName = originalFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}_${cleanName}`;
-    const storageRef = ref(storage, fileName);
-    const uploadTask = uploadBytesResumable(storageRef, originalFile);
-
-    return await new Promise<string>((resolve, reject) => {
-      let isSettled = false;
-
-      // 15-second timeout for starting/progressing Firebase Storage upload. If blocked by network or CORS, fallback to chunked upload.
-      const fallbackTimer = setTimeout(() => {
-        if (!isSettled) {
-          console.warn("Direct Firebase Storage upload timed out, falling back to chunked server upload...");
-          try { uploadTask.cancel(); } catch (e) {}
-          uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false })
-            .then((res) => { if (!isSettled) { isSettled = true; resolve(res); } })
-            .catch((err) => { if (!isSettled) { isSettled = true; reject(err); } });
-        }
-      }, 15000);
-
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          if (snapshot.totalBytes > 0) {
-            const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            onProgress(Math.min(Math.round(p), 99));
-          }
-        },
-        (error) => {
-          if (isSettled) return;
-          console.warn('Direct Firebase Storage upload error, falling back to chunked server upload:', error);
-          clearTimeout(fallbackTimer);
-          uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false })
-            .then((res) => { if (!isSettled) { isSettled = true; resolve(res); } })
-            .catch((err) => { if (!isSettled) { isSettled = true; reject(err); } });
-        },
-        async () => {
-          if (isSettled) return;
-          clearTimeout(fallbackTimer);
-          try {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            onProgress(100);
-            isSettled = true;
-            resolve(url);
-          } catch (err) {
-            uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false })
-              .then((res) => { if (!isSettled) { isSettled = true; resolve(res); } })
-              .catch((e) => { if (!isSettled) { isSettled = true; reject(e); } });
-          }
-        }
-      );
-    });
-  } catch (err) {
-    console.warn("Direct Firebase Storage upload exception, using chunked server upload fallback:", err);
-    return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false });
-  }
+  // Fast direct server chunked upload
+  return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: false });
 }
 
 export async function uploadChunkedFile(
@@ -214,16 +159,7 @@ export async function uploadChunkedFile(
     throw new Error('Invalid response from server');
   } catch (err) {
     console.error("Chunked upload failed:", err);
-    
-    // Emergency Fallback: Base64 to Firebase
-    try {
-      console.warn("Falling back to Base64 upload...");
-      return await uploadViaBase64(file, onProgress);
-    } catch (e) {
-      console.error("Base64 fallback failed:", e);
-    }
-    
-    throw new Error('فشل رفع الملف يرجى التحقق من اتصالك والمحاولة مرة أخرى.');
+    throw new Error('فشل رفع الملف. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
   }
 }
 
