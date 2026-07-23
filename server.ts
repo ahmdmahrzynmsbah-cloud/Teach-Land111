@@ -386,7 +386,15 @@ async function startServer() {
   });
 
   // API Route for chunked upload
-  app.post('/api/upload-chunk', upload.single('chunk'), (req, res) => {
+  app.post('/api/upload-chunk', (req, res, next) => {
+    upload.single('chunk')(req, res, (err) => {
+      if (err) {
+        console.error('Multer chunk upload error:', err);
+        return res.status(400).json({ error: err.message || 'Chunk upload error' });
+      }
+      next();
+    });
+  }, (req, res) => {
     try {
       const { fileId, chunkIndex } = req.body;
       const chunkFile = req.file;

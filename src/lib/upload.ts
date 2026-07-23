@@ -1,5 +1,3 @@
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { storage } from './firebase';
 import toast from 'react-hot-toast';
 
 export interface UploadOptions {
@@ -92,64 +90,6 @@ function uploadViaXhr(
     xhr.open('POST', endpoint, true);
     xhr.send(formData);
   });
-}
-
-export async function uploadFileToFirebase(
-  originalFile: File,
-  onProgress: (progress: number) => void = () => {},
-  options?: UploadOptions
-): Promise<string> {
-  if (!originalFile) {
-    const errorMsg = 'لم يتم تحديد أي ملف للرفع.';
-    toast.error(errorMsg);
-    throw new Error(errorMsg);
-  }
-
-  const maxLimit = options?.maxSizeBytes || 500 * 1024 * 1024;
-  if (originalFile.size > maxLimit) {
-    const sizeInMB = (maxLimit / (1024 * 1024)).toFixed(0);
-    const errorMsg = `حجم الملف كبير جداً. الحد الأقصى هو ${sizeInMB} ميجابايت.`;
-    toast.error(errorMsg);
-    throw new Error(errorMsg);
-  }
-
-  onProgress(5);
-
-  // 1. Try direct POST upload first for non-video or files under 50MB
-  if (!originalFile.type.startsWith('video/') && originalFile.size <= 50 * 1024 * 1024) {
-    try {
-      return await uploadViaXhr(originalFile, '/api/upload', onProgress);
-    } catch (err) {
-      console.warn("Direct upload failed, switching to base64 server upload:", err);
-    }
-  }
-
-  // 2. Try Base64 JSON Server upload for non-video files under 30MB (very reliable for PDFs)
-  if (!originalFile.type.startsWith('video/') && originalFile.size <= 30 * 1024 * 1024) {
-    try {
-      return await uploadViaBase64Server(originalFile, onProgress);
-    } catch (err) {
-      console.warn("Base64 server upload failed, switching to chunked upload:", err);
-    }
-  }
-
-  // 3. Fallback or large video files use chunked upload
-  try {
-    return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: options?.bunny });
-  } catch (err) {
-    console.warn("Chunked upload failed, trying base64 fallback:", err);
-  }
-
-  // 4. Client Firebase Storage Base64 fallback for small files (< 15MB)
-  if (originalFile.size <= 15 * 1024 * 1024) {
-    try {
-      return await uploadViaBase64(originalFile, onProgress);
-    } catch (err) {
-      console.error("Client base64 fallback failed:", err);
-    }
-  }
-
-  throw new Error('فشل رفع الملف. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
 }
 
 async function uploadViaBase64Server(
@@ -298,44 +238,86 @@ export async function uploadChunkedFile(
     throw new Error('Invalid merge response');
   } catch (err) {
     console.error("Chunked upload failed:", err);
-
-    // Emergency Fallback for small files (< 10MB): Base64
-    if (file.size <= 10 * 1024 * 1024) {
-      try {
-        console.warn("Attempting emergency base64 upload fallback...");
-        return await uploadViaBase64(file, onProgress);
-      } catch (e) {
-        console.error("Base64 fallback failed:", e);
-      }
-    }
-
-    throw new Error('فشل رفع الملف. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
+    throw err;
   }
 }
 
-async function uploadViaBase64(
+// Client-side Memory Base64 fallback (works for files < 15MB without server or Firebase storage!)
+async function uploadViaClientBase64(
   file: File,
   onProgress: (progress: number) => void
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = async () => {
-      onProgress(50);
-      try {
-        const base64Data = reader.result as string;
-        const fileExtension = file.name.split('.').pop() || 'bin';
-        const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
-        const storageRef = ref(storage, fileName);
-        await uploadString(storageRef, base64Data, 'data_url');
-        onProgress(90);
-        const url = await getDownloadURL(storageRef);
-        onProgress(100);
-        resolve(url);
-      } catch (e) {
-        reject(e);
+    reader.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        const p = Math.min(Math.round((event.loaded / event.total) * 95), 95);
+        onProgress(p);
       }
     };
-    reader.onerror = () => reject(new Error('Base64 read error'));
+    reader.onload = () => {
+      onProgress(100);
+      resolve(reader.result as string);
+    };
+    reader.onerror = () => reject(new Error('فشل قراءة الملف كـ Base64'));
     reader.readAsDataURL(file);
   });
+}
+
+export async function uploadFileToFirebase(
+  originalFile: File,
+  onProgress: (progress: number) => void = () => {},
+  options?: UploadOptions
+): Promise<string> {
+  if (!originalFile) {
+    const errorMsg = 'لم يتم تحديد أي ملف للرفع.';
+    toast.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  const maxLimit = options?.maxSizeBytes || 500 * 1024 * 1024;
+  if (originalFile.size > maxLimit) {
+    const sizeInMB = (maxLimit / (1024 * 1024)).toFixed(0);
+    const errorMsg = `حجم الملف كبير جداً. الحد الأقصى هو ${sizeInMB} ميجابايت.`;
+    toast.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  onProgress(5);
+
+  // 1. Try Direct XHR multipart POST upload (/api/upload)
+  if (!originalFile.type.startsWith('video/') && originalFile.size <= 50 * 1024 * 1024) {
+    try {
+      return await uploadViaXhr(originalFile, '/api/upload', onProgress);
+    } catch (err) {
+      console.warn("Direct upload failed, switching to chunked upload:", err);
+    }
+  }
+
+  // 2. Try Chunked Upload (/api/upload-chunk & /api/upload-merge)
+  try {
+    return await uploadChunkedFile(originalFile, onProgress, { ...options, bunny: options?.bunny });
+  } catch (err) {
+    console.warn("Chunked upload failed, switching to base64 server upload:", err);
+  }
+
+  // 3. Try Base64 JSON Server upload (/api/upload-base64)
+  if (!originalFile.type.startsWith('video/') && originalFile.size <= 30 * 1024 * 1024) {
+    try {
+      return await uploadViaBase64Server(originalFile, onProgress);
+    } catch (err) {
+      console.warn("Base64 server upload failed, attempting client memory fallback:", err);
+    }
+  }
+
+  // 4. Guaranteed fallback for files <= 15MB: Client Memory Base64 Data URL
+  if (originalFile.size <= 15 * 1024 * 1024) {
+    try {
+      return await uploadViaClientBase64(originalFile, onProgress);
+    } catch (err) {
+      console.error("Client memory base64 fallback failed:", err);
+    }
+  }
+
+  throw new Error('فشل رفع الملف. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
 }
