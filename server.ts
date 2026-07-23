@@ -5,6 +5,38 @@ import cors from "cors";
 import fs from "fs";
 import { exec } from "child_process";
 import { createServer as createViteServer } from "vite";
+import { initializeApp } from "firebase/app";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import mime from "mime-types";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA_CNc0I6__SHRAFCmEP_llclnUIwiJc2k",
+  authDomain: "teachland-e69ee.firebaseapp.com",
+  projectId: "teachland-e69ee",
+  storageBucket: "teachland-e69ee.firebasestorage.app",
+  messagingSenderId: "1011126564456",
+  appId: "1:1011126564456:web:1ca33bef938ddc5eed2ddd",
+  measurementId: "G-G3YEJ3QLSH"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const firebaseStorage = getStorage(firebaseApp);
+
+async function uploadFileToFirebaseServer(filePath: string, originalName: string) {
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+    const storageRef = ref(firebaseStorage, `uploads/${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, '_')}`);
+    
+    const snapshot = await uploadBytes(storageRef, fileBuffer, {
+      contentType: mimeType
+    });
+    
+    return await getDownloadURL(snapshot.ref);
+  } catch (err) {
+    console.error("Firebase server upload failed:", err);
+    throw err;
+  }
+}
 
 // Helper function to apply faststart to video files
 function applyFaststart(filePath: string): Promise<void> {
@@ -72,9 +104,20 @@ async function startServer() {
     
     await applyFaststart(req.file.path);
 
-    // Return the URL to the uploaded file
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
+    try {
+      // Upload to Firebase Storage instead of keeping local
+      const firebaseUrl = await uploadFileToFirebaseServer(req.file.path, req.file.originalname);
+      
+      // Cleanup local file
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error("Error deleting temp file:", err);
+      });
+
+      res.json({ url: firebaseUrl });
+    } catch (err: any) {
+      console.error("Upload route error:", err);
+      res.status(500).json({ error: 'Failed to upload file to storage.' });
+    }
   });
 
   // Bunny Stream dynamic library resolution
@@ -427,15 +470,33 @@ async function startServer() {
             });
 
           } catch (error: any) {
-            console.warn("Bunny Upload failed, falling back to local file path:", error.message || error);
-            // Don't delete local temp file since we are using it as fallback
+            console.warn("Bunny Upload failed, falling back to Firebase Storage:", error.message || error);
+            // Fallback to Firebase Storage
+            const firebaseUrl = await uploadFileToFirebaseServer(finalPath, originalName);
+            
+            // Delete local temp file
+            fs.unlink(finalPath, (err) => {
+              if (err) console.error("Error deleting temp file:", err);
+            });
+            
             res.json({
               success: true,
-              url: `/uploads/${finalFilename}`
+              url: firebaseUrl
             });
           }
         } else {
-          res.json({ url: `/uploads/${finalFilename}` });
+          try {
+            const firebaseUrl = await uploadFileToFirebaseServer(finalPath, originalName);
+            
+            fs.unlink(finalPath, (err) => {
+              if (err) console.error("Error deleting temp file:", err);
+            });
+            
+            res.json({ url: firebaseUrl });
+          } catch (fbErr) {
+            console.error("Firebase Storage upload failed:", fbErr);
+            res.status(500).json({ error: 'Failed to upload file.' });
+          }
         }
       });
     } catch (err) {
