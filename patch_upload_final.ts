@@ -1,4 +1,6 @@
+import fs from 'fs';
 
+const uploadTs = `
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
 import toast from 'react-hot-toast';
@@ -74,7 +76,7 @@ export async function uploadFileToFirebase(
   const maxLimit = options?.maxSizeBytes || 500 * 1024 * 1024;
   if (originalFile.size > maxLimit) {
     const sizeInMB = (maxLimit / (1024 * 1024)).toFixed(0);
-    const errorMsg = `حجم الملف كبير جداً. الحد الأقصى هو ${sizeInMB} ميجابايت.`;
+    const errorMsg = \`حجم الملف كبير جداً. الحد الأقصى هو \${sizeInMB} ميجابايت.\`;
     toast.error(errorMsg);
     throw new Error(errorMsg);
   }
@@ -105,7 +107,7 @@ export async function uploadChunkedFile(
       const formData = new FormData();
       formData.append('chunkIndex', i.toString());
       formData.append('fileId', fileId);
-      formData.append('chunk', chunk, `chunk-${i}.bin`);
+      formData.append('chunk', chunk, \`chunk-\${i}.bin\`);
       
       let chunkSuccess = false;
       let retries = 3;
@@ -118,12 +120,12 @@ export async function uploadChunkedFile(
           }, 15000); // 15 seconds timeout per chunk
           
           if (!response.ok) {
-            throw new Error(`Chunk upload failed: ${response.status}`);
+            throw new Error(\`Chunk upload failed: \${response.status}\`);
           }
           chunkSuccess = true;
         } catch (err) {
           retries--;
-          console.warn(`Chunk ${i} failed, retrying... (${retries} left)`, err);
+          console.warn(\`Chunk \${i} failed, retrying... (\${retries} left)\`, err);
           if (retries === 0) throw err;
           await new Promise(r => setTimeout(r, 1000));
         }
@@ -150,7 +152,7 @@ export async function uploadChunkedFile(
     const data = await mergeResponse.json();
     if (data.videoId) {
       onProgress(100);
-      return `bunny:${data.videoId}`;
+      return \`bunny:\${data.videoId}\`;
     } else if (data.url) {
       onProgress(100);
       return data.url;
@@ -185,7 +187,7 @@ async function uploadViaBase64(
       try {
         const base64Data = reader.result as string;
         const fileExtension = file.name.split('.').pop() || 'bin';
-        const fileName = `uploads/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+        const fileName = \`uploads/\${Date.now()}-\${Math.random().toString(36).substring(7)}.\${fileExtension}\`;
         const storageRef = ref(storage, fileName);
         await uploadString(storageRef, base64Data, 'data_url');
         onProgress(90);
@@ -200,3 +202,7 @@ async function uploadViaBase64(
     reader.readAsDataURL(file);
   });
 }
+`;
+
+fs.writeFileSync('src/lib/upload.ts', uploadTs);
+console.log('patched upload.ts with 100% chunked strategy');
