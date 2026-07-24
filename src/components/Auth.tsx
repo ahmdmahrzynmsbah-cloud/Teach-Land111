@@ -6,7 +6,7 @@ import { ArrowRight, Lock, User, Phone, MapPin, School, BookOpen, GraduationCap,
 import ThemeToggle from './ThemeToggle';
 import { usePlatformSettings } from '../context/PlatformSettingsContext';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 const EGYPT_GOVERNORATES = [
@@ -279,6 +279,19 @@ export default function Auth() {
             ...baseData,
             isApproved: true
           });
+          
+          if (adminCode && adminCode !== 'TeachLand@2026_master_admin') {
+            try {
+               const q = query(collection(db, 'adminInvitations'), where('code', '==', adminCode), where('used', '==', false));
+               const snap = await getDocs(q);
+               if (!snap.empty) {
+                 const inviteDoc = snap.docs[0];
+                 await updateDoc(inviteDoc.ref, { used: true, usedBy: user.uid, usedAt: new Date().toISOString() });
+               }
+            } catch(e) {
+               console.error('Error updating admin invitation status:', e);
+            }
+          }
         }
         navigate('/dashboard');
       }
@@ -565,12 +578,24 @@ export default function Auth() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (adminCode === '1234' || adminCode === '123456' || adminCode.toLowerCase() === 'teachlandadmin') {
-                        setRoleSelected(true);
-                        setShowAdminCode(false);
-                      } else {
-                        setError('رمز التحقق الذي أدخلته غير صحيح!');
+                    onClick={async () => {
+                      if (!adminCode) return;
+                      try {
+                        if (adminCode === 'TeachLand@2026_master_admin') {
+                          setRoleSelected(true);
+                          setShowAdminCode(false);
+                          return;
+                        }
+                        const q = query(collection(db, 'adminInvitations'), where('code', '==', adminCode), where('used', '==', false));
+                        const snap = await getDocs(q);
+                        if (!snap.empty) {
+                          setRoleSelected(true);
+                          setShowAdminCode(false);
+                        } else {
+                          setError('رمز التحقق الذي أدخلته غير صحيح أو منتهي الصلاحية!');
+                        }
+                      } catch (e) {
+                         setError('حدث خطأ أثناء التحقق من الرمز.');
                       }
                     }}
                     className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 transition-colors cursor-pointer"

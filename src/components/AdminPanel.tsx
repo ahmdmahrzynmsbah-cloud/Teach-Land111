@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import AdminVisualStats from './AdminVisualStats';
+import AdminAccessCodes from './AdminAccessCodes';
 import SubscriptionRequests from './SubscriptionRequests';
 import SupportRequestsAdmin from './SupportRequestsAdmin';
 
@@ -959,11 +960,11 @@ const WalletRecharge = ({ users, setUsers, payments }: { users: any[], setUsers:
   );
 };
 
-export default function AdminPanel({ initialTab, userData }: { initialTab?: 'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests' | 'support_requests'; userData?: any }) {
+export default function AdminPanel({ initialTab, userData }: { initialTab?: 'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests' | 'support_requests' | 'admin_codes'; userData?: any }) {
   const [users, setUsers] = useState<any[]>([]);
   const [progressRecords, setProgressRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests' | 'support_requests'>(initialTab || 'students');
+  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'parents' | 'approvals' | 'special_approvals' | 'payments' | 'settings' | 'wallet' | 'courses' | 'subscription_requests' | 'support_requests' | 'admin_codes'>(initialTab || 'students');
 
   useEffect(() => {
     if (initialTab) {
@@ -2409,6 +2410,23 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
           >
             إعدادات المنصة
             {activeTab === 'settings' && (
+              <motion.div 
+                layoutId="adminTab" 
+                className="absolute -bottom-[13px] left-0 right-0 h-[3px] bg-[#00B4D8] dark:bg-[#D4AF37] rounded-t-full shadow-[0_1px_4px_rgba(0,180,216,0.3)] dark:shadow-[0_1px_4px_rgba(212,175,55,0.3)]" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('admin_codes')}
+            className={`pb-2 text-sm font-black transition-colors relative ${
+              activeTab === 'admin_codes'
+                ? 'text-[#00B4D8] dark:text-[#D4AF37]'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+            }`}
+          >
+            أكواد المديرين
+            {activeTab === 'admin_codes' && (
               <motion.div 
                 layoutId="adminTab" 
                 className="absolute -bottom-[13px] left-0 right-0 h-[3px] bg-[#00B4D8] dark:bg-[#D4AF37] rounded-t-full shadow-[0_1px_4px_rgba(0,180,216,0.3)] dark:shadow-[0_1px_4px_rgba(212,175,55,0.3)]" 
@@ -4139,6 +4157,8 @@ const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
               </button>
             </div>
           </form>
+        ) : activeTab === 'admin_codes' ? (
+          <AdminAccessCodes userData={userData} />
         ) : (
           <AnimatePresence mode="wait">
             <motion.div

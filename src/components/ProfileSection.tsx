@@ -6,7 +6,7 @@ import {
   BookOpen, Calendar, IdCard, Sparkles, Check, Download, RefreshCw, Award,
   BarChart2, Trophy, TrendingUp, CheckCircle, Play, Users, Percent, Star, ChevronLeft, Zap, LogOut
 } from 'lucide-react';
-import { updateDoc, doc, deleteDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { updateDoc, doc, deleteDoc, getDocs, collection, query, where, addDoc } from 'firebase/firestore';
 import { updatePassword, deleteUser, reauthenticateWithCredential, EmailAuthProvider, updateEmail } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { toast } from 'react-hot-toast';
@@ -33,6 +33,8 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
   const [loading, setLoading] = useState(false);
   const [avatarBg, setAvatarBg] = useState(userData?.avatarBg || 'from-[#00B4D8] to-[#0077B6]');
   const [isFlipped, setIsFlipped] = useState(false);
+  const [generatedAdminCode, setGeneratedAdminCode] = useState('');
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   // Stats and courses state
   const [myCourses, setMyCourses] = useState<any[]>([]);
@@ -1341,9 +1343,69 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
 
 
                   {userData?.role === 'admin' && (
-                    <div className="p-4 bg-gray-50 dark:bg-[#222230]/50 rounded-2xl border border-gray-100 dark:border-[#2D2D3D] text-sm leading-relaxed text-gray-500 dark:text-gray-400 font-bold">
-                      <p>أنت قمت بتسجيل الدخول كمدير نظام (Admin).</p>
-                      <p className="mt-2 text-xs">لا يتطلب حساب المدير استكمال بيانات دراسية أو إعدادات تدريس إضافية.</p>
+                    <div className="p-6 bg-gray-50 dark:bg-[#222230]/50 rounded-2xl border border-gray-100 dark:border-[#2D2D3D] space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="w-5 h-5 text-[#00B4D8] dark:text-[#D4AF37]" />
+                        <h3 className="font-black text-gray-900 dark:text-white">إدارة صلاحيات المديرين</h3>
+                      </div>
+                      <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400 font-bold">
+                        يمكنك من هنا توليد رمز تحقق سري لإرساله إلى مدير نظام جديد لتسجيل حساب جديد بصلاحيات الإدارة.
+                      </p>
+                      
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setGeneratingCode(true);
+                              const code = 'ADMIN-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+                              await addDoc(collection(db, 'adminInvitations'), {
+                                code,
+                                createdBy: userData.id,
+                                createdAt: new Date().toISOString(),
+                                used: false
+                              });
+                              setGeneratedAdminCode(code);
+                              toast.success('تم توليد رمز تحقق جديد لمدير النظام بنجاح!');
+                            } catch (error) {
+                              console.error('Error generating admin code:', error);
+                              toast.error('حدث خطأ أثناء توليد الرمز.');
+                            } finally {
+                              setGeneratingCode(false);
+                            }
+                          }}
+                          disabled={generatingCode}
+                          className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2"
+                        >
+                          {generatingCode ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                          توليد رمز جديد
+                        </button>
+                      </div>
+
+                      {generatedAdminCode && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 rounded-xl"
+                        >
+                          <p className="text-xs font-bold text-green-800 dark:text-green-400 mb-2">الرمز الجديد (صالح لمرة واحدة):</p>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 block text-left bg-white dark:bg-[#0D0D12] px-3 py-2 rounded-lg font-mono text-sm border border-green-100 dark:border-green-900/50 text-gray-900 dark:text-gray-100">
+                              {generatedAdminCode}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(generatedAdminCode);
+                                toast.success('تم نسخ الرمز بنجاح!');
+                              }}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors shrink-0"
+                            >
+                              نسخ الرمز
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
                   )}
                   {userData?.role === 'parent' && (

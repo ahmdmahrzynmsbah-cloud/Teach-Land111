@@ -1266,13 +1266,9 @@ export default function Dashboard() {
         timeoutId = setTimeout(() => {
           if (!userDataLoadedRef.current) {
             console.error("Timeout: User data could not be loaded from Firestore.");
-            toast.error("عذراً، لم نتمكن من تحميل بيانات حسابك. يرجى تسجيل الدخول مرة أخرى.");
-            auth.signOut().then(() => {
-              navigate('/login');
-            });
+            // Do NOT sign out immediately, just let it wait or show error
           }
-          setLoading(false);
-        }, 5000);
+        }, 15000);
 
         unsubscribeSnapshot = onSnapshot(docRef, async (docSnap) => {
           if (docSnap.exists()) {
@@ -1734,6 +1730,26 @@ export default function Dashboard() {
 
   if (loading) {
     return <LuxuriousLoader fullScreen size="lg" />;
+  }
+
+  if (!userData) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0D0D12]">
+        <div className="text-center space-y-4 max-w-sm p-8 bg-white dark:bg-[#1A1A24] rounded-3xl shadow-xl border border-gray-100 dark:border-[#2D2D3D]">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto">
+            <LogOut className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 dark:text-white">خطأ في تحميل البيانات</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">عذراً، لم نتمكن من تحميل بيانات حسابك. يرجى تسجيل الدخول مرة أخرى.</p>
+          <button
+            onClick={() => auth.signOut().then(() => navigate('/login'))}
+            className="w-full py-3 bg-[#00B4D8] text-white rounded-xl font-bold text-sm hover:bg-[#0096B4] transition-colors"
+          >
+            العودة لتسجيل الدخول
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Intercept unapproved users in real-time
