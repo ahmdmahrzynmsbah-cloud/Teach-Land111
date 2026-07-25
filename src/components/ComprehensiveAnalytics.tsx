@@ -114,6 +114,7 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
     totalTransactions: 0,
     recentUsers: [] as any[],
     subjectStats: [] as any[],
+    monthlyRegistrations: [] as any[],
     recentSubmissions: [] as any[]
   });
 
@@ -187,15 +188,57 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
           });
           const subjectStatsData = Object.entries(subjectsMap).map(([name, value]) => ({ name, value }));
 
+          // Calculate actual real monthly registrations for chart accurately from Firestore user data
+          const ARABIC_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+          const now = new Date();
+          const monthlyRegistrationsData = [];
+
+          for (let i = 5; i >= 0; i--) {
+            const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const year = monthDate.getFullYear();
+            const monthIdx = monthDate.getMonth();
+            const monthName = ARABIC_MONTHS[monthIdx];
+            const endOfMonth = new Date(year, monthIdx + 1, 0, 23, 59, 59, 999);
+
+            let studentCount = 0;
+            let teacherCount = 0;
+
+            userList.forEach(u => {
+              let uDate: Date | null = null;
+              if (u.createdAt) {
+                if (typeof u.createdAt === 'string' || typeof u.createdAt === 'number') {
+                  uDate = new Date(u.createdAt);
+                } else if (u.createdAt?.toDate) {
+                  uDate = u.createdAt.toDate();
+                }
+              }
+
+              const registeredByThisMonth = !uDate || isNaN(uDate.getTime()) || uDate <= endOfMonth;
+
+              if (registeredByThisMonth) {
+                const uRole = u.role || 'student';
+                if (uRole === 'student') studentCount++;
+                else if (uRole === 'teacher') teacherCount++;
+              }
+            });
+
+            monthlyRegistrationsData.push({
+              name: monthName,
+              الطلاب: studentCount,
+              المعلمون: teacherCount
+            });
+          }
+
           setAdminStats({
             totalStudents: students,
             totalTeachers: teachers,
             totalParents: parents,
             totalCourses: coursesSnap.size,
-            totalLessons: 0, // Placeholder
+            totalLessons: 0,
             totalTransactions: transSnap.size,
             recentUsers: userList.slice(0, 5),
-            subjectStats: subjectStatsData.length > 0 ? subjectStatsData : [{ name: 'لغة عربية', value: 3 }, { name: 'رياضيات', value: 2 }, { name: 'علوم', value: 2 }],
+            subjectStats: subjectStatsData,
+            monthlyRegistrations: monthlyRegistrationsData,
             recentSubmissions: []
           });
 
@@ -298,15 +341,7 @@ export default function ComprehensiveAnalytics({ userData, linkedStudent }: Comp
 
   // --- 1. ADMIN DASHBOARD ---
   if (role === 'admin') {
-    // Chart Mock Registration Data
-    const monthlyRegistrations = [
-      { name: 'فبراير', الطلاب: 20, المعلمون: 3 },
-      { name: 'مارس', الطلاب: 35, المعلمون: 5 },
-      { name: 'أبريل', الطلاب: 48, المعلمون: 8 },
-      { name: 'مايو', الطلاب: 70, المعلمون: 12 },
-      { name: 'يونيو', الطلاب: 95, المعلمون: 15 },
-      { name: 'يوليو', الطلاب: 120, المعلمون: 18 }
-    ];
+    const monthlyRegistrations = adminStats.monthlyRegistrations || [];
 
     return (
       <div className="space-y-8 animate-in fade-in duration-300">

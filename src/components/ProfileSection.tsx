@@ -699,9 +699,7 @@ export default function ProfileSection({ userData, onUpdateUserData }: ProfileSe
                                       "عدد الطلاب": c.enrolledStudentIds?.length || 0
                                     }))
                                   : [
-                                      { name: 'كورس الكيمياء ١', "عدد الطلاب": 120 },
-                                      { name: 'كورس الكيمياء ٢', "عدد الطلاب": 240 },
-                                      { name: 'مراجعة الباب الأول', "عدد الطلاب": 180 }
+                                      { name: 'لا توجد كورسات', "عدد الطلاب": 0 }
                                     ]
                               }
                             >
